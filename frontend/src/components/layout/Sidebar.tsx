@@ -1,10 +1,12 @@
-import React from 'react';
 import { 
   Receipt,
   Package,
   BookOpen,
   ShoppingCart,
   FileText,
+  Printer,
+  FileSpreadsheet,
+  Settings,
   LayoutDashboard, 
   Truck, 
   Cpu, 
@@ -53,8 +55,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Sales & Finance Suite',
       items: [
         { key: 'typeahead_billing', label: '5-Tier Typeahead Billing', icon: Receipt, badge: 'FAST', badgeColor: 'status-pill-orange' },
+        { key: 'invoice_viewer', label: 'Official A4 Tax Invoices', icon: Printer, badge: 'A4', badgeColor: 'status-pill-cyan' },
         { key: 'plastics_catalog', label: '500+ Plastics Master', icon: Package, badge: '500+' },
+        { key: 'customers', label: 'Customer 360 & Ledgers', icon: Users, badge: '360°', badgeColor: 'status-pill-cyan' },
         { key: 'bookkeeping', label: 'Tally Financial Ledgers', icon: BookOpen, badge: 'TALLY', badgeColor: 'status-pill-success' },
+        { key: 'reports', label: 'Financial & Audit Reports', icon: FileSpreadsheet, badge: '6 REPTS' },
         { key: 'pos', label: 'Express Retail Counter', icon: ShoppingCart },
         { key: 'gst_billing', label: 'GST Invoicing & E-Way', icon: FileText },
       ]
@@ -70,11 +75,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'Cognitive Mesh',
+      title: 'Cognitive Mesh & Config',
       items: [
         { key: 'swarm_visualizer', label: 'AI Multi-Agent Swarm', icon: Bot, badge: 'LIVE', badgeColor: 'status-pill-cyan' },
         { key: 'doc_ai', label: 'Cognitive OCR Scanner', icon: FileSearch },
         { key: 'bpmn', label: 'BPMN 2.0 Workflows', icon: GitFork },
+        { key: 'settings', label: 'Multi-Company & Settings', icon: Settings, badge: '4 CO' },
       ]
     }
   ];

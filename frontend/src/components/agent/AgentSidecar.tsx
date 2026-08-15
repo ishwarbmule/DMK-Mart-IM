@@ -37,10 +37,11 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
   ]);
 
   const quickPrompts = [
-    'Restock 500 units of RAW-STL-404',
-    '3-Way Match AP Invoice INV-2026-0091',
-    'Audit Trial Balance Invariants in ClickHouse',
-    'Simulate 60-Day Cash Flow Liquidity'
+    'Show sales summary',
+    'List low stock products',
+    'What\'s our cash position?',
+    'Top selling products',
+    'Audit Trial Balance'
   ];
 
   const handleSend = (textToSend?: string) => {
@@ -62,48 +63,85 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
       let responseMsg: AgentExecutionMessage;
       const lower = query.toLowerCase();
 
-      if (lower.includes('restock') || lower.includes('reorder') || lower.includes('raw-stl-404')) {
+      if (lower.includes('sales summary') || lower.includes('sales')) {
+        responseMsg = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'agent',
+          agentName: 'DMK Business Copilot',
+          content: '📊 **Sales Summary & Performance (MTD August 2026)**:\n\n• **Gross Revenue**: ₹48,25,000 (117 Invoices)\n• **Total Received**: ₹39,80,000\n• **Outstanding Receivables**: ₹8,45,000\n• **Top Vertical**: DMK Plastics Chairs (42% share)\n• **Average Invoice Value**: ₹41,239\n\nAll billing entries have auto-posted to General Ledger with zero variance.',
+          timestamp: 'Just now',
+          confidenceScore: 0.995,
+          planSteps: [
+            { stepId: 1, assignedAgent: 'AI Copilot', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_dashboard(companyId="comp-01")', status: 'COMPLETED', requiresHumanApproval: false },
+            { stepId: 2, assignedAgent: 'AI Copilot', actionVerb: 'AGGREGATE_SALES', description: 'Summed BillingLine entries across 4 categories', status: 'COMPLETED', requiresHumanApproval: false }
+          ],
+          reasoningTrace: [
+            'Tool get_dashboard returned MTD revenue ₹48.25L',
+            'Compared with previous month (+14.2% MoM growth)',
+            'Identified 0 overdue unpaid invoices past 60 days'
+          ]
+        };
+      } else if (lower.includes('low stock') || lower.includes('stock') || lower.includes('reorder')) {
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
           agentName: 'SCM & Sourcing Agent',
-          content: 'I analyzed historical lead-time volatility and calculated dynamic ROP for RAW-STL-404. Current stock (1,850 units) is below dynamic ROP (3,179 units). Generated Purchase Order PO-2026-088 for $12,500.00.',
+          content: '⚠️ **Low Stock Alert (3 Items Below Dynamic Reorder Level)**:\n\n1. **DMK Royal High-Back Arm Chair**: 45 Pcs (Reorder Level: 100 Pcs)\n2. **DMK 20L Heavy-Duty Utility Bucket**: 28 Pcs (Reorder Level: 80 Pcs)\n3. **Virgin Polypropylene (PP) Granules**: 1,200 kg (Reorder Level: 3,000 kg)\n\nEstimated PO Cost to Restock: **₹2,45,000**.',
           timestamp: 'Just now',
-          confidenceScore: 0.978,
+          confidenceScore: 0.988,
           planSteps: [
-            { stepId: 1, assignedAgent: 'SCM Agent', actionVerb: 'CALCULATE_DYNAMIC_ROP', description: 'Calculated ROP: 3,179 units (Z=2.326, 99% SL)', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 2, assignedAgent: 'Finance Controller', actionVerb: 'ENCUMBER_FUNDS', description: 'Locked $12,500 budget in Cost Center CC-PLANT-01', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 3, assignedAgent: 'SCM Agent', actionVerb: 'CREATE_PURCHASE_ORDER', description: 'Drafted PO-2026-088 for Global Steel Dynamics ($12,500.00)', status: 'AWAITING_APPROVAL', requiresHumanApproval: true }
+            { stepId: 1, assignedAgent: 'SCM Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: search_products(lowStock=true)', status: 'COMPLETED', requiresHumanApproval: false },
+            { stepId: 2, assignedAgent: 'SCM Agent', actionVerb: 'CALCULATE_ROP', description: 'Computed dynamic safety stock across 580 catalog items', status: 'COMPLETED', requiresHumanApproval: false }
           ],
           reasoningTrace: [
-            'Daily demand mean = 150 units, stddev = 30 units',
-            'Supplier lead time = 14 days, lead time stddev = 3 days',
-            'Combined variance formula derived safety stock = 1,079 units',
-            'Total PO value exceeds autonomous ceiling ($10,000) -> Escalated for human signature'
+            'Daily moulding machine consumption: 250kg PP granules/day',
+            'Vendor delivery lead time: 4 business days',
+            'Generated draft Purchase Order PO-2026-092 for polymer supplier'
           ],
           suggestedAction: {
-            label: 'Authorize & Dispatch PO-2026-088 ($12,500.00)',
+            label: 'Draft Restock Purchase Order (₹2,45,000)',
             actionType: 'APPROVE_PO',
-            payload: { poNumber: 'PO-2026-088', amount: 12500 }
+            payload: { poNumber: 'PO-2026-092', amount: 245000 }
           }
         };
-      } else if (lower.includes('invoice') || lower.includes('match') || lower.includes('0091')) {
+      } else if (lower.includes('cash') || lower.includes('liquidity') || lower.includes('position')) {
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
           agentName: 'Financial Controller Agent',
-          content: 'Executed optical OCR and deterministic 3-way match on AP Invoice INV-2026-0091 against Purchase Order PO-2026-0811 and Goods Receipt GRN-2026-0419. Zero discrepancy detected.',
+          content: '💰 **DMK Mart Live Cash & Liquidity Position**:\n\n• **HDFC Current Operating A/c**: ₹10,00,000\n• **Cash in Hand (Factory Counter)**: ₹4,65,000\n• **Total Liquid Cash**: **₹14,65,000**\n• **Expected Inflow (Next 7 Days)**: ₹6,80,000 (Customer Receivables)\n• **Upcoming GST Cash Liability**: ₹1,73,500 (Due 20th August)',
           timestamp: 'Just now',
           confidenceScore: 0.998,
           planSteps: [
-            { stepId: 1, assignedAgent: 'Document AI', actionVerb: 'OCR_EXTRACT', description: 'LayoutLMv3 extracted line items & tax amounts (99.8% confidence)', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 2, assignedAgent: 'Finance Controller', actionVerb: '3_WAY_MATCH', description: 'Matched invoice price ($4,200) == PO price ($4,200) & received qty (50 units)', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 3, assignedAgent: 'Finance Controller', actionVerb: 'POST_GL_JOURNAL', description: 'Auto-posted entry JE-2026-9012 to General Ledger with 2/10 early-pay discount queue', status: 'COMPLETED', requiresHumanApproval: false }
+            { stepId: 1, assignedAgent: 'Finance Controller', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_cash_position()', status: 'COMPLETED', requiresHumanApproval: false }
           ],
           reasoningTrace: [
-            'Vendor: Global Steel Dynamics Corp (Tier-1 Preferred)',
-            'Price tolerance: 0.00% variance | Quantity tolerance: 0.00% variance',
-            'Straight-through autonomous processing criteria fulfilled (Amount < $10,000)'
+            'Queried Account 10000 (Cash) and Account 10001 (Bank)',
+            'Net liquidity ratio = 4.2x monthly fixed overheads (Excellent)'
+          ]
+        };
+      } else if (lower.includes('top selling') || lower.includes('top product') || lower.includes('popular')) {
+        responseMsg = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'agent',
+          agentName: 'Sales Intelligence Agent',
+          content: '🏆 **Top 5 Best-Selling Plastic Products (By Volume & Revenue)**:\n\n1. **DMK Royal High-Back Arm Chair** (1,450 Pcs • ₹5,51,000)\n2. **DMK 20L Heavy-Duty Utility Bucket** (2,100 Pcs • ₹3,78,000)\n3. **DMK Industrial Heavy Perforated Crate** (620 Pcs • ₹3,59,600)\n4. **DMK 100L Heavy Waste Dustbin** (340 Pcs • ₹2,38,000)\n5. **DMK 6-Piece Transparent Spice Jar Set** (1,200 Sets • ₹2,16,000)',
+          timestamp: 'Just now',
+          confidenceScore: 0.992,
+          planSteps: [
+            { stepId: 1, assignedAgent: 'Sales Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_billing(topProducts=true)', status: 'COMPLETED', requiresHumanApproval: false }
+          ]
+        };
+      } else if (lower.includes('trial balance') || lower.includes('audit') || lower.includes('bookkeeping')) {
+        responseMsg = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'agent',
+          agentName: 'Auditor Agent',
+          content: '⚖️ **Trial Balance & Double-Entry Integrity Check**:\n\n• **Total Debit Balances**: ₹31,13,500.00\n• **Total Credit Balances**: ₹31,13,500.00\n• **Variance**: **₹0.00 (100% In Equilibrium)**\n• **Accounts Audited**: 17 Chart of Accounts\n• **Status**: Double-entry books are completely balanced and compliant with Indian Accounting Standards.',
+          timestamp: 'Just now',
+          confidenceScore: 1.0,
+          planSteps: [
+            { stepId: 1, assignedAgent: 'Auditor Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_trial_balance()', status: 'COMPLETED', requiresHumanApproval: false }
           ]
         };
       } else {
@@ -111,12 +149,12 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
           id: `msg-${Date.now() + 1}`,
           sender: 'orchestrator',
           agentName: 'Master Orchestrator',
-          content: `Decomposed prompt into multi-agent workflow. Telemetry verified across ClickHouse OLAP aggregation tables. All invariants balanced with 0.00 discrepancy.`,
+          content: `Processed natural language prompt. Telemetry verified across DMK Mart databases. All invariants balanced with 0.00 discrepancy.`,
           timestamp: 'Just now',
-          confidenceScore: 0.965,
+          confidenceScore: 0.97,
           reasoningTrace: [
             'Queried real-time multi-dimensional trial balance across all subsidiaries',
-            'EBITDA on track (+8.4% above quarterly forecast)',
+            'Sales revenue on track (+14.2% MoM growth)',
             'Zero anomalous journal entries flagged in past 24 hours'
           ]
         };

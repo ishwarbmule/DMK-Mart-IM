@@ -17,6 +17,8 @@ import {
   X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ExportDropdown } from '../common/ExportDropdown';
+import { ExportOptions } from '../../utils/exportUtils';
 
 interface POSItem {
   id: string;
@@ -60,6 +62,23 @@ export const POSTerminalModule: React.FC = () => {
     { ...catalog[0], quantity: 2, discountPct: 0 },
     { ...catalog[2], quantity: 1, discountPct: 5 }
   ]);
+
+  const posExportOptions: ExportOptions<POSItem> = {
+    filename: `DMK_POS_Item_Master_${new Date().toISOString().split('T')[0]}`,
+    title: 'DMK Mart Retail Express Counter — POS Price Master',
+    companyName: 'DMK Mart Retail & Express POS',
+    subtitle: `Active Category: ${activeCategory} (${catalog.length} items)`,
+    columns: [
+      { header: 'Barcode / SKU', key: 'sku', width: 16 },
+      { header: 'Item Description', key: 'name', width: 34 },
+      { header: 'Category', key: 'category', width: 16 },
+      { header: 'HSN Code', key: 'hsnCode', width: 12 },
+      { header: 'GST %', key: 'gstRate', format: v => `${v}%`, width: 10, align: 'right' },
+      { header: 'Unit Price (₹)', key: 'price', format: v => `₹${v.toFixed(2)}`, width: 16, align: 'right' },
+      { header: 'Counter Stock', key: 'stock', width: 14, align: 'right' }
+    ],
+    data: catalog
+  };
 
   const categories = ['ALL', 'Groceries', 'Electronics', 'Apparel', 'Essentials'];
 
@@ -180,7 +199,8 @@ export const POSTerminalModule: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <ExportDropdown options={posExportOptions} buttonLabel="Export POS Items" size="sm" />
           <span className="status-pill status-pill-success">
             REGISTER #01 (ONLINE)
           </span>
@@ -316,23 +336,25 @@ export const POSTerminalModule: React.FC = () => {
         <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '620px' }}>
           <div>
             {/* Customer Details */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
               <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600 }}>CUSTOMER NAME</label>
+                <label className="form-label" style={{ fontSize: '11px' }}>CUSTOMER NAME</label>
                 <input 
                   type="text" 
                   value={customerName} 
                   onChange={e => setCustomerName(e.target.value)}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '4px', color: '#FFF', fontSize: '12px' }}
+                  className="form-input"
+                  placeholder="Walk-in Customer"
                 />
               </div>
               <div>
-                <label style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600 }}>PHONE / LOYALTY ID</label>
+                <label className="form-label" style={{ fontSize: '11px' }}>PHONE / LOYALTY ID</label>
                 <input 
                   type="text" 
                   value={customerPhone} 
                   onChange={e => setCustomerPhone(e.target.value)}
-                  style={{ width: '100%', padding: '6px 8px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '4px', color: '#FFF', fontSize: '12px' }}
+                  className="form-input"
+                  placeholder="+91 90000 00000"
                 />
               </div>
             </div>
@@ -477,7 +499,7 @@ export const POSTerminalModule: React.FC = () => {
           onClick={() => setShowReceiptModal(false)}
         >
           <div 
-            className="glass-panel"
+            className="glass-panel pos-receipt-print-only"
             style={{
               width: '100%',
               maxWidth: '420px',
@@ -556,7 +578,7 @@ export const POSTerminalModule: React.FC = () => {
               <br />For returns, present this original invoice within 7 days.
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button 
                 onClick={() => window.print()}
                 className="btn-primary" 

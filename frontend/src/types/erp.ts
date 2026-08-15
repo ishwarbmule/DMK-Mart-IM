@@ -6,7 +6,10 @@ export type ModuleKey =
   | 'dashboard'
   | 'typeahead_billing'
   | 'plastics_catalog'
+  | 'customers'
   | 'bookkeeping'
+  | 'reports'
+  | 'settings'
   | 'pos'
   | 'gst_billing'
   | 'invoice_viewer'
@@ -93,6 +96,7 @@ export interface CustomerParty {
   gstin?: string;
   stateCode: string;
   phone: string;
+  email?: string;
   city: string;
   partyType: 'DISTRIBUTOR' | 'WHOLESALER' | 'RETAILER' | 'CASH_CUSTOMER';
   assignedTier: PricingTierKey;

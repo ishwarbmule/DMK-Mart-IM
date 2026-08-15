@@ -9,6 +9,9 @@ import { MultiCompanyBillingModule } from './components/modules/MultiCompanyBill
 import { PlasticsProductMaster } from './components/modules/PlasticsProductMaster';
 import { FinancialBookkeepingModule } from './components/modules/FinancialBookkeepingModule';
 import { DownloadableInvoiceViewer } from './components/modules/DownloadableInvoiceViewer';
+import { CustomersManagementModule } from './components/modules/CustomersManagementModule';
+import { ReportsModule } from './components/modules/ReportsModule';
+import { SettingsModule } from './components/modules/SettingsModule';
 import { POSTerminalModule } from './components/modules/POSTerminalModule';
 import { GSTBillingModule } from './components/modules/GSTBillingModule';
 import { FinanceModule } from './components/modules/FinanceModule';
@@ -19,16 +22,24 @@ import { HRMPayrollModule } from './components/modules/HRMPayrollModule';
 import { CRMCPQModule } from './components/modules/CRMCPQModule';
 import { DocumentAILab } from './components/modules/DocumentAILab';
 import { BPMNWorkflowModule } from './components/modules/BPMNWorkflowModule';
-import { ModuleKey, TenantInfo, CompanyVertical, FinalInvoiceData } from './types/erp';
-import { DMK_COMPANIES } from './data/multiCompanyData';
+import { ModuleKey, TenantInfo, FinalInvoiceData } from './types/erp';
+import { ERPDataProvider, useERPData } from './context/ERPContext';
+import { CheckCircle2, X } from 'lucide-react';
 
-export const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { 
+    activeCompany, 
+    setActiveCompany, 
+    currentInvoice, 
+    setCurrentInvoice, 
+    feedbackBanner, 
+    setFeedbackBanner 
+  } = useERPData();
+
   const [activeModule, setActiveModule] = useState<ModuleKey>('typeahead_billing');
-  const [activeCompany, setActiveCompany] = useState<CompanyVertical>(DMK_COMPANIES[0]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidecarOpen, setIsSidecarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [currentInvoice, setCurrentInvoice] = useState<FinalInvoiceData | null>(null);
 
   const tenant: TenantInfo = {
     id: '00000000-0000-0000-0000-000000000001',
@@ -39,7 +50,7 @@ export const App: React.FC = () => {
     autoApprovalThreshold: 50000
   };
 
-  const handleExecutePromptFromPalette = (prompt: string) => {
+  const handleExecutePromptFromPalette = (_prompt: string) => {
     setIsSidecarOpen(true);
   };
 
@@ -48,8 +59,8 @@ export const App: React.FC = () => {
     setActiveModule('invoice_viewer');
   };
 
-  const handlePostToLedger = (invoiceData: FinalInvoiceData) => {
-    // Automatically synced to bookkeeping ledger
+  const handlePostToLedger = (_invoiceData: FinalInvoiceData) => {
+    // Already handled globally by addFastOrderBill in ERPContext
   };
 
   const renderActiveModule = () => {
@@ -66,8 +77,14 @@ export const App: React.FC = () => {
         );
       case 'plastics_catalog':
         return <PlasticsProductMaster />;
+      case 'customers':
+        return <CustomersManagementModule onViewCustomerInvoice={handleViewGeneratedInvoice} />;
       case 'bookkeeping':
         return <FinancialBookkeepingModule activeCompany={activeCompany} />;
+      case 'reports':
+        return <ReportsModule activeCompany={activeCompany} />;
+      case 'settings':
+        return <SettingsModule activeCompany={activeCompany} onSelectCompany={setActiveCompany} />;
       case 'invoice_viewer':
         return (
           <DownloadableInvoiceViewer 
@@ -110,6 +127,40 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+      {/* Universal Real-Time Sync Toast Notification Banner */}
+      {feedbackBanner && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: '18px',
+            right: '24px',
+            zIndex: 99999,
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+            color: '#FFF',
+            padding: '12px 18px',
+            borderRadius: '8px',
+            boxShadow: '0 8px 32px rgba(16, 185, 129, 0.35)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '13px',
+            fontWeight: 600,
+            maxWidth: '560px',
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+        >
+          <CheckCircle2 size={18} color="#FFF" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>{feedbackBanner}</span>
+          <button 
+            onClick={() => setFeedbackBanner(null)}
+            style={{ background: 'transparent', border: 'none', color: '#FFF', cursor: 'pointer', opacity: 0.8 }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Sidebar */}
       <Sidebar 
         activeModule={activeModule}
@@ -153,4 +204,13 @@ export const App: React.FC = () => {
   );
 };
 
+export const App: React.FC = () => {
+  return (
+    <ERPDataProvider>
+      <AppContent />
+    </ERPDataProvider>
+  );
+};
+
 export default App;
+

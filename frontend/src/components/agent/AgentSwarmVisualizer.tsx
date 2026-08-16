@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, DollarSign, Truck, Cpu, Users, ShieldCheck, Sparkles, Activity, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Bot, IndianRupee, Truck, Cpu, Users, ShieldCheck, Sparkles, Activity, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export const AgentSwarmVisualizer: React.FC = () => {
   const agents = [
@@ -16,7 +16,7 @@ export const AgentSwarmVisualizer: React.FC = () => {
     {
       name: 'Financial Controller Agent',
       role: 'Double-Entry GL, 3-Way Match & Tax',
-      icon: DollarSign,
+      icon: IndianRupee,
       status: 'AUTONOMOUS_POSTING',
       tasksCompleted: 8940,
       confidence: '99.8%',

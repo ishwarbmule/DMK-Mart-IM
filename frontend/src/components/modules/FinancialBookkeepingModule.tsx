@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   BookOpen, 
   Plus, 
   ArrowUpRight, 
   ArrowDownRight, 
   CheckCircle2, 
-  DollarSign, 
+  IndianRupee, 
   FileText, 
   Calendar, 
   Layers, 
@@ -15,15 +15,32 @@ import {
   TrendingUp,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Wallet,
+  Receipt,
+  ArrowDownLeft,
+  ShoppingBag,
+  Building2,
+  UserCheck,
+  Filter
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useERPData, FullJournalEntry, JournalLineItem, PartyLedgerRow } from '../../context/ERPContext';
-import { CompanyVertical } from '../../types/erp';
+import { CompanyVertical, FinalInvoiceData } from '../../types/erp';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { ExportOptions } from '../../utils/exportUtils';
-import { formatDate, formatFullDate, getRelativeDateLabel, isDateInPreset, DateFilterPreset } from '../../utils/dateUtils';
-import { Calendar as CalendarIcon, Clock, Filter } from 'lucide-react';
+import { 
+  formatDate, 
+  formatFullDate, 
+  getRelativeDateLabel, 
+  isDateInPreset, 
+  DateFilterPreset,
+  getTodayFormatted,
+  getYesterdayFormatted,
+  getCurrentMonthFormatted,
+  getTodayISODate,
+  getOffsetISODate
+} from '../../utils/dateUtils';
 
 interface FinancialBookkeepingProps {
   activeCompany: CompanyVertical;
@@ -34,14 +51,26 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
     journalEntries, 
     partyLedgers, 
     customers, 
-    addJournalEntry: addGlobalJournalEntry 
+    allInvoices,
+    addJournalEntry: addGlobalJournalEntry,
+    recordCustomerPayment
   } = useERPData();
 
-  const [activeTab, setActiveTab] = useState<'journal_entries' | 'trial_balance' | 'profit_loss' | 'balance_sheet' | 'party_ledger'>('journal_entries');
+  const [activeTab, setActiveTab] = useState<'journal_entries' | 'daily_daybook' | 'trial_balance' | 'profit_loss' | 'balance_sheet' | 'party_ledger'>('journal_entries');
   const [selectedPartyId, setSelectedPartyId] = useState<string>(customers[0]?.id || 'cust-01');
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(journalEntries[0]?.id || 'JE-2026-0001');
+  const [expandedDayDate, setExpandedDayDate] = useState<string | null>(getTodayISODate());
   const [showNewEntryModal, setShowNewEntryModal] = useState<boolean>(false);
+  const [showPaymentReceiptModal, setShowPaymentReceiptModal] = useState<boolean>(false);
   const [journalDateFilter, setJournalDateFilter] = useState<DateFilterPreset>('ALL');
+
+  // Payment Receipt Modal State
+  const [payCustId, setPayCustId] = useState<string>(customers[0]?.id || 'cust-01');
+  const [payAmount, setPayAmount] = useState<number>(50000);
+  const [payMode, setPayMode] = useState<'NEFT_RTGS' | 'UPI' | 'CASH' | 'CHEQUE'>('NEFT_RTGS');
+  const [payRef, setPayRef] = useState<string>(`UTR-${Math.floor(10000000 + Math.random() * 90000000)}`);
+  const [payDate, setPayDate] = useState<string>(getTodayISODate());
+  const [payNotes, setPayNotes] = useState<string>('Payment settlement against open sales invoices.');
 
   // Chart of Accounts (17 accounts as per PRD Section 12.3)
   const chartOfAccounts = [
@@ -67,7 +96,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
   // Modal State for New Entry
   const [newVoucherType, setNewVoucherType] = useState<any>('Payment');
   const [newDesc, setNewDesc] = useState('');
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newDate, setNewDate] = useState(getTodayISODate());
   const [modalLines, setModalLines] = useState<JournalLineItem[]>([
     { id: '1', accountId: '52000', accountName: 'Factory & Warehouse Rent Expense', accountGroup: 'Expense', debit: 35000, credit: 0, memo: 'Office Rent' },
     { id: '2', accountId: '10001', accountName: 'HDFC Operating Bank Account', accountGroup: 'Asset', debit: 0, credit: 35000, memo: 'Paid via Cheque' }
@@ -100,12 +129,16 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
 
   const handleSaveNewEntry = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isModalBalanced || !newDesc.trim()) return;
+    if (!isModalBalanced) return;
 
-    confetti({ particleCount: 70, spread: 60 });
+    confetti({
+      particleCount: 70,
+      spread: 60,
+      colors: ['#FF6B00', '#10B981', '#FFFFFF']
+    });
 
     const newEntry: FullJournalEntry = {
-      id: `JE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `JE-${Date.now()}`,
       entryNumber: `JE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       date: newDate,
       description: newDesc,
@@ -118,138 +151,212 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
     addGlobalJournalEntry(newEntry);
     setShowNewEntryModal(false);
     setNewDesc('');
-    setExpandedEntryId(newEntry.id);
   };
 
-  const selectedParty = customers.find(c => c.id === selectedPartyId) || customers[0];
-  const partyLedger = partyLedgers[selectedPartyId] || [
-    { id: '1', date: '2026-08-01', voucherNumber: 'OB-2026-001', voucherType: 'JOURNAL', particulars: 'Opening Balance (Brought Forward)', debitAmount: selectedParty?.outstandingBalance || 0, creditAmount: 0, runningBalance: selectedParty?.outstandingBalance || 0, balanceType: 'Dr', narration: 'Opening Dr' }
-  ];
+  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (payAmount <= 0) return;
 
-  const totalDr = partyLedger.reduce((acc, e) => acc + e.debitAmount, 0);
-  const totalCr = partyLedger.reduce((acc, e) => acc + e.creditAmount, 0);
+    confetti({
+      particleCount: 60,
+      spread: 60,
+      colors: ['#10B981', '#FF6B00', '#FFFFFF']
+    });
+
+    recordCustomerPayment(
+      payCustId,
+      payAmount,
+      payMode,
+      payRef,
+      payDate,
+      payNotes
+    );
+
+    setShowPaymentReceiptModal(false);
+    setPayRef(`UTR-${Math.floor(10000000 + Math.random() * 90000000)}`);
+  };
+
+  // =========================================================================
+  // DYNAMIC DAILY DAYBOOK & OPENING / CLOSING BALANCE HISTORY REGISTER
+  // =========================================================================
+  const dailyDaybookHistory = useMemo(() => {
+    // 1. Gather all unique transaction dates from invoices and journal entries
+    const datesSet = new Set<string>();
+    allInvoices.forEach(inv => datesSet.add(inv.invoiceDate));
+    journalEntries.forEach(je => datesSet.add(je.date));
+    
+    // Ensure today and past few days exist
+    datesSet.add(getTodayISODate());
+    datesSet.add(getOffsetISODate(-1));
+    datesSet.add(getOffsetISODate(-2));
+    datesSet.add(getOffsetISODate(-3));
+    datesSet.add(getOffsetISODate(-4));
+    datesSet.add(getOffsetISODate(-5));
+    datesSet.add(getOffsetISODate(-7));
+    datesSet.add(getOffsetISODate(-8));
+
+    const sortedDatesAsc = Array.from(datesSet).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+    // Baseline Cash & Bank opening balance at beginning of month
+    let runningCashBank = 2000000;
+    let runningDebtors = 1250000;
+
+    const computedDays = sortedDatesAsc.map(dayDate => {
+      const openCashBank = runningCashBank;
+      const openDebtors = runningDebtors;
+
+      // Invoices billed on this day
+      const dayInvoices = allInvoices.filter(inv => inv.invoiceDate === dayDate);
+      const grossSalesBilled = dayInvoices.reduce((acc, inv) => acc + inv.grandTotal, 0);
+
+      // Journal entries on this day
+      const dayJournals = journalEntries.filter(je => je.date === dayDate);
+
+      // Cash/Bank receipts collected (Inflow)
+      const receiptsCollected = dayJournals
+        .filter(je => je.voucherType === 'Receipt' || (je.voucherType === 'Sales' && je.lines.some(l => l.accountId === '10000' || l.accountId === '10001')))
+        .reduce((acc, je) => acc + je.totalDebit, 0);
+
+      // Payments / Outflows
+      const payoutsOutflow = dayJournals
+        .filter(je => je.voucherType === 'Payment')
+        .reduce((acc, je) => acc + je.totalDebit, 0);
+
+      // Net Cashflow movement
+      const netMovement = receiptsCollected - payoutsOutflow;
+      const closingCashBank = openCashBank + netMovement;
+      const closingDebtors = Math.max(0, openDebtors + grossSalesBilled - receiptsCollected);
+
+      // Advance running balances
+      runningCashBank = closingCashBank;
+      runningDebtors = closingDebtors;
+
+      return {
+        date: dayDate,
+        dayLabel: getRelativeDateLabel(dayDate),
+        formattedDate: formatDate(dayDate),
+        openCashBank,
+        grossSalesBilled,
+        receiptsCollected,
+        payoutsOutflow,
+        netMovement,
+        closingCashBank,
+        closingDebtors,
+        dayInvoices,
+        dayJournals,
+        voucherCount: dayInvoices.length + dayJournals.length
+      };
+    });
+
+    // Return in descending order (Most recent Today first)
+    return computedDays.reverse();
+  }, [allInvoices, journalEntries]);
+
+  // Today's summary metrics
+  const todayRecord = dailyDaybookHistory.find(d => d.date === getTodayISODate()) || dailyDaybookHistory[0];
+  const totalReceivablesDue = useMemo(() => customers.reduce((acc, c) => acc + c.outstandingBalance, 0), [customers]);
+
+  // Party Ledger Calculations
+  const selectedParty = customers.find(c => c.id === selectedPartyId) || customers[0];
+  const partyLedger = partyLedgers[selectedParty.id] || [];
+  const totalDr = partyLedger.reduce((acc, r) => acc + r.debitAmount, 0);
+  const totalCr = partyLedger.reduce((acc, r) => acc + r.creditAmount, 0);
   const closingBalance = totalDr - totalCr;
 
-  const trialBalanceRows = [
-    { code: '10000', name: 'Cash in Hand (Factory Counter)', type: 'Asset', dr: 465000, cr: 0 },
-    { code: '10001', name: 'HDFC Operating Bank Account', type: 'Asset', dr: 1000000, cr: 0 },
-    { code: '12000', name: 'Accounts Receivable (Sundry Debtors)', type: 'Asset', dr: 270000, cr: 0 },
-    { code: '13000', name: 'Polymer Finished Goods Inventory', type: 'Asset', dr: 300000, cr: 0 },
-    { code: '14000', name: 'Fixed Assets (Injection Moulding Machines)', type: 'Asset', dr: 500000, cr: 0 },
-    { code: '20000', name: 'Accounts Payable (Polymer Suppliers)', type: 'Liability', dr: 0, cr: 150000 },
-    { code: '21000', name: 'GST Payable (Duties & Taxes)', type: 'Liability', dr: 0, cr: 85000 },
-    { code: '30000', name: "Owner's Capital & Reserves", type: 'Equity', dr: 0, cr: 1800000 },
-    { code: '31000', name: 'Retained Earnings', type: 'Equity', dr: 0, cr: 200000 },
-    { code: '40000', name: 'Domestic Plastic Sales Revenue', type: 'Revenue', dr: 0, cr: 1250000 },
-    { code: '50000', name: 'Cost of Goods Sold (Raw PP Granules)', type: 'Expense', dr: 450000, cr: 0 },
-    { code: '51000', name: 'Salaries & Factory Wages Expense', type: 'Expense', dr: 120000, cr: 0 },
-    { code: '52000', name: 'Factory & Warehouse Rent Expense', type: 'Expense', dr: 35000, cr: 0 },
-    { code: '53000', name: 'Power & Utilities Expense', type: 'Expense', dr: 8500, cr: 0 },
-    { code: '54000', name: 'Marketing & Transport Freight', type: 'Expense', dr: 15000, cr: 0 },
-    { code: '55000', name: 'Purchase of Ancillary Materials', type: 'Expense', dr: 455000, cr: 0 }
-  ];
-
-  // Dynamic Export Options per active tab
   const getTabExportOptions = (): ExportOptions => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayISODate();
 
-    if (activeTab === 'journal_entries') {
-      const totDr = journalEntries.reduce((acc, j) => acc + j.totalDebit, 0);
-      const totCr = journalEntries.reduce((acc, j) => acc + j.totalCredit, 0);
+    if (activeTab === 'daily_daybook') {
       return {
-        filename: `DMK_Journal_Entries_${activeCompany.companyCode}_${today}`,
+        filename: `DMK_Daily_Daybook_Balance_History_${today}`,
+        title: `Daily Daybook & Opening/Closing Balance Register — ${activeCompany.companyName}`,
+        companyName: activeCompany.companyName,
+        companyGstin: activeCompany.gstin,
+        subtitle: `Audited Daily Balance History • Position as of ${formatFullDate(new Date())}`,
+        columns: [
+          { header: 'Date', key: 'formattedDate', width: 14 },
+          { header: 'Opening Cash & Bank (₹)', key: 'openCashBank', format: v => Number(v).toLocaleString('en-IN'), width: 22, align: 'right' },
+          { header: 'Sales Billed (₹)', key: 'grossSalesBilled', format: v => Number(v).toLocaleString('en-IN'), width: 18, align: 'right' },
+          { header: 'Collections Inflow (₹)', key: 'receiptsCollected', format: v => Number(v).toLocaleString('en-IN'), width: 20, align: 'right' },
+          { header: 'Disbursements Outflow (₹)', key: 'payoutsOutflow', format: v => Number(v).toLocaleString('en-IN'), width: 22, align: 'right' },
+          { header: 'Net Movement (₹)', key: 'netMovement', format: v => (Number(v) >= 0 ? `+${Number(v).toLocaleString('en-IN')}` : Number(v).toLocaleString('en-IN')), width: 18, align: 'right' },
+          { header: 'Closing Cash & Bank (₹)', key: 'closingCashBank', format: v => Number(v).toLocaleString('en-IN'), width: 22, align: 'right' },
+          { header: 'Closing Debtors Due (₹)', key: 'closingDebtors', format: v => Number(v).toLocaleString('en-IN'), width: 22, align: 'right' }
+        ],
+        data: dailyDaybookHistory
+      };
+    } else if (activeTab === 'journal_entries') {
+      const filtered = journalEntries.filter(je => isDateInPreset(je.date, journalDateFilter));
+      return {
+        filename: `DMK_Journal_Entries_${today}`,
         title: `${activeCompany.companyName} — General Journal Register`,
         companyName: activeCompany.companyName,
         companyGstin: activeCompany.gstin,
-        subtitle: `All Verified Double-Entry Vouchers (${journalEntries.length} entries)`,
+        subtitle: `Filter: ${journalDateFilter} • Generated on ${today}`,
         columns: [
-          { header: 'Entry Number', key: 'entryNumber', width: 16 },
-          { header: 'Voucher Date', key: 'date', width: 12 },
-          { header: 'Description / Particulars', key: 'description', width: 35 },
-          { header: 'Voucher Type', key: 'voucherType', width: 14, align: 'center' },
+          { header: 'Entry #', key: 'entryNumber', width: 15 },
+          { header: 'Date', key: 'date', width: 12 },
+          { header: 'Voucher Type', key: 'voucherType', width: 14 },
+          { header: 'Description', key: 'description', width: 35 },
           { header: 'Total Debit (₹)', key: 'totalDebit', width: 16, align: 'right' },
           { header: 'Total Credit (₹)', key: 'totalCredit', width: 16, align: 'right' }
         ],
-        data: journalEntries,
-        summaryRows: [
-          {
-            label: 'Total Journal Debits & Credits',
-            values: {
-              totalDebit: totDr,
-              totalCredit: totCr
-            }
-          }
-        ]
+        data: filtered
       };
     } else if (activeTab === 'trial_balance') {
       return {
-        filename: `DMK_Trial_Balance_${activeCompany.companyCode}_${today}`,
-        title: `${activeCompany.companyName} — Chart of Accounts Trial Balance`,
+        filename: `DMK_Trial_Balance_${today}`,
+        title: `${activeCompany.companyName} — Trial Balance Statement`,
         companyName: activeCompany.companyName,
         companyGstin: activeCompany.gstin,
-        subtitle: 'Double-Entry Equilibrium Verification (17 Accounts)',
         columns: [
           { header: 'Account Code', key: 'code', width: 14 },
-          { header: 'Account Name', key: 'name', width: 35 },
-          { header: 'Classification', key: 'type', width: 14 },
-          { header: 'Debit Balance (₹)', key: 'dr', format: v => v > 0 ? v : 0, width: 16, align: 'right' },
-          { header: 'Credit Balance (₹)', key: 'cr', format: v => v > 0 ? v : 0, width: 16, align: 'right' }
+          { header: 'Account Description', key: 'name', width: 35 },
+          { header: 'Account Group', key: 'type', width: 16 },
+          { header: 'Debit (₹)', key: 'debit', width: 16, align: 'right' },
+          { header: 'Credit (₹)', key: 'credit', width: 16, align: 'right' }
         ],
-        data: trialBalanceRows,
-        summaryRows: [
-          {
-            label: 'Trial Balance Grand Equilibrium (₹0.00 Diff)',
-            values: {
-              dr: 3113500,
-              cr: 3113500
-            }
-          }
+        data: [
+          { code: '10000', name: 'Cash in Hand (Counter)', type: 'Asset', debit: 465000, credit: 0 },
+          { code: '10001', name: 'HDFC Operating Bank Account', type: 'Asset', debit: 1000000, credit: 0 },
+          { code: '12000', name: 'Accounts Receivable (Sundry Debtors)', type: 'Asset', debit: 270000, credit: 0 },
+          { code: '13000', name: 'Polymer Finished Inventory', type: 'Asset', debit: 300000, credit: 0 },
+          { code: '14000', name: 'Fixed Assets (Machinery)', type: 'Asset', debit: 500000, credit: 0 },
+          { code: '20000', name: 'Accounts Payable (Suppliers)', type: 'Liability', debit: 0, credit: 150000 },
+          { code: '21000', name: 'GST Payable (Duties & Taxes)', type: 'Liability', debit: 0, credit: 85000 },
+          { code: '30000', name: "Owner's Capital & Reserves", type: 'Equity', debit: 0, credit: 1800000 },
+          { code: '31000', name: 'Retained Earnings', type: 'Equity', debit: 0, credit: 200000 },
+          { code: '40000', name: 'Domestic Plastic Sales Revenue', type: 'Revenue', debit: 0, credit: 420000 },
+          { code: '50000', name: 'Cost of Goods Sold (Raw Polymer)', type: 'Expense', debit: 120000, credit: 0 }
         ]
       };
     } else if (activeTab === 'profit_loss') {
       return {
-        filename: `DMK_Profit_Loss_Statement_${activeCompany.companyCode}_${today}`,
-        title: `${activeCompany.companyName} — Statement of Profit & Loss`,
+        filename: `DMK_Profit_Loss_${today}`,
+        title: `${activeCompany.companyName} — Profit & Loss Account`,
         companyName: activeCompany.companyName,
         companyGstin: activeCompany.gstin,
-        subtitle: 'Financial Year 2026-2027 (MTD August 2026)',
         columns: [
-          { header: 'Classification / Head', key: 'head', width: 20 },
-          { header: 'Account Particulars', key: 'account', width: 35 },
+          { header: 'Nature', key: 'type', width: 14 },
+          { header: 'Particulars', key: 'head', width: 35 },
           { header: 'Amount (₹)', key: 'amount', width: 18, align: 'right' }
         ],
         data: [
-          { head: 'Revenue', account: '40000 - Domestic Plastic Sales Revenue', amount: 1250000 },
-          { head: 'Revenue', account: '41000 - Service & Ancillary Revenue', amount: 0 },
-          { head: 'Expense', account: '50000 - Cost of Goods Sold (Raw PP Granules)', amount: 450000 },
-          { head: 'Expense', account: '51000 - Salaries & Factory Wages Expense', amount: 120000 },
-          { head: 'Expense', account: '52000 - Factory & Warehouse Rent Expense', amount: 35000 },
-          { head: 'Expense', account: '53000 - Power & Utilities Expense', amount: 8500 },
-          { head: 'Expense', account: '54000 - Marketing & Distribution Freight', amount: 15000 },
-          { head: 'Expense', account: '55000 - Purchase of Packaging Materials', amount: 455000 }
-        ],
-        summaryRows: [
-          {
-            label: 'Total Operating Revenue',
-            values: { amount: 1250000 }
-          },
-          {
-            label: 'Total Operating Expenses',
-            values: { amount: 1083500 }
-          },
-          {
-            label: 'Net Operating Profit (13.32% Margin)',
-            values: { amount: 166500 }
-          }
+          { type: 'Revenue', head: 'Domestic Plastic Sales Revenue', amount: 420000 },
+          { type: 'Revenue', head: 'Moulding Job Work & Service Income', amount: 45000 },
+          { type: 'Expense', head: 'Cost of Goods Sold (Raw Polymer)', amount: 120000 },
+          { type: 'Expense', head: 'Salaries & Factory Wages', amount: 95000 },
+          { type: 'Expense', head: 'Factory & Warehouse Rent', amount: 35000 },
+          { type: 'Expense', head: 'Power, Electricity & Fuel', amount: 28500 },
+          { type: 'Expense', head: 'Marketing & Transport Freight', amount: 20000 }
         ]
       };
     } else if (activeTab === 'balance_sheet') {
       return {
-        filename: `DMK_Balance_Sheet_${activeCompany.companyCode}_${today}`,
+        filename: `DMK_Balance_Sheet_${today}`,
         title: `${activeCompany.companyName} — Balance Sheet Statement`,
         companyName: activeCompany.companyName,
         companyGstin: activeCompany.gstin,
-        subtitle: 'Position as at 15th August 2026',
         columns: [
           { header: 'Accounting Nature', key: 'nature', width: 16 },
           { header: 'Account Group / Head', key: 'head', width: 35 },
@@ -264,18 +371,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
           { nature: 'Liability', head: '20000 - Accounts Payable (Suppliers)', amount: 150000 },
           { nature: 'Liability', head: '21000 - GST Payable (Duties & Taxes)', amount: 85000 },
           { nature: 'Equity', head: "30000 - Owner's Capital & Reserves", amount: 1800000 },
-          { nature: 'Equity', head: '31000 - Retained Earnings', amount: 200000 },
-          { nature: 'Equity', head: 'Current Period Net Profit (from P&L)', amount: 166500 }
-        ],
-        summaryRows: [
-          {
-            label: 'Total Assets',
-            values: { amount: 2535000 }
-          },
-          {
-            label: 'Total Liabilities & Equity',
-            values: { amount: 2401500 }
-          }
+          { nature: 'Equity', head: '31000 - Retained Earnings', amount: 200000 }
         ]
       };
     } else {
@@ -284,7 +380,6 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
         title: `Customer Statement of Account — ${selectedParty.partyName}`,
         companyName: activeCompany.companyName,
         companyGstin: activeCompany.gstin,
-        subtitle: `GSTIN: ${selectedParty.gstin || 'Unregistered'} • City: ${selectedParty.city} • Phone: ${selectedParty.phone}`,
         columns: [
           { header: 'Voucher Date', key: 'date', width: 12 },
           { header: 'Voucher Number', key: 'voucherNumber', width: 16 },
@@ -294,23 +389,14 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
           { header: 'Credit Amount (₹)', key: 'creditAmount', width: 16, align: 'right' },
           { header: 'Running Balance (₹)', key: 'runningBalance', format: (_, r) => `${r.runningBalance} ${r.balanceType}`, width: 18, align: 'right' }
         ],
-        data: partyLedger,
-        summaryRows: [
-          {
-            label: 'Closing Outstanding Balance Due',
-            values: {
-              debitAmount: totalDr,
-              creditAmount: totalCr,
-              runningBalance: `₹${Math.abs(closingBalance).toLocaleString('en-IN')} Dr`
-            }
-          }
-        ]
+        data: partyLedger
       };
     }
   };
 
   const getTabLabel = () => {
     switch (activeTab) {
+      case 'daily_daybook': return 'Daily Daybook';
       case 'journal_entries': return 'Journal Entries';
       case 'trial_balance': return 'Trial Balance';
       case 'profit_loss': return 'P&L Statement';
@@ -322,6 +408,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
       {/* Top Banner */}
       <div 
         className="glass-panel"
@@ -338,19 +425,29 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <h1 style={{ fontSize: '20px', fontWeight: 900, color: '#FFF' }}>
-              Double-Entry Financial Bookkeeping & Statements
+              Financial Bookkeeping & Daily Opening / Closing Ledgers
             </h1>
             <span className="status-pill status-pill-success">
               100% BALANCED
             </span>
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            {activeCompany.companyName} • Tally-standard Chart of Accounts, Journal Vouchers, Trial Balance, P&L & Balance Sheet
+            Everyday Opening & Closing Cash/Bank Registers, Tally Double-Entry Journals, Trial Balance, P&L & Balance Sheets
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            onClick={() => setShowPaymentReceiptModal(true)}
+            className="btn-outline-orange"
+            style={{ padding: '8px 14px', fontSize: '12px' }}
+          >
+            <Receipt size={15} />
+            <span>Record Customer Receipt</span>
+          </button>
+
           <ExportDropdown options={getTabExportOptions()} buttonLabel={`Export ${getTabLabel()}`} />
+          
           <button 
             onClick={() => setShowNewEntryModal(true)}
             className="btn-primary"
@@ -362,8 +459,17 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs Navigation */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveTab('daily_daybook')}
+          className={activeTab === 'daily_daybook' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Wallet size={14} />
+          <span>Daily Daybook & Balances ({dailyDaybookHistory.length} Days)</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('journal_entries')}
           className={activeTab === 'journal_entries' ? 'btn-primary' : 'btn-secondary'}
@@ -372,30 +478,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
           <BookOpen size={14} />
           <span>Journal Entries ({journalEntries.length})</span>
         </button>
-        <button
-          onClick={() => setActiveTab('trial_balance')}
-          className={activeTab === 'trial_balance' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '8px 16px', fontSize: '12px' }}
-        >
-          <Scale size={14} />
-          <span>Trial Balance</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('profit_loss')}
-          className={activeTab === 'profit_loss' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '8px 16px', fontSize: '12px' }}
-        >
-          <TrendingUp size={14} />
-          <span>Profit & Loss (P&L)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('balance_sheet')}
-          className={activeTab === 'balance_sheet' ? 'btn-primary' : 'btn-secondary'}
-          style={{ padding: '8px 16px', fontSize: '12px' }}
-        >
-          <ShieldCheck size={14} />
-          <span>Balance Sheet</span>
-        </button>
+
         <button
           onClick={() => setActiveTab('party_ledger')}
           className={activeTab === 'party_ledger' ? 'btn-primary' : 'btn-secondary'}
@@ -404,16 +487,266 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
           <FileText size={14} />
           <span>Customer Party Ledger</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('trial_balance')}
+          className={activeTab === 'trial_balance' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '8px 16px', fontSize: '12px' }}
+        >
+          <Scale size={14} />
+          <span>Trial Balance</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('profit_loss')}
+          className={activeTab === 'profit_loss' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '8px 16px', fontSize: '12px' }}
+        >
+          <TrendingUp size={14} />
+          <span>Profit & Loss (P&L)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('balance_sheet')}
+          className={activeTab === 'balance_sheet' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '8px 16px', fontSize: '12px' }}
+        >
+          <ShieldCheck size={14} />
+          <span>Balance Sheet</span>
+        </button>
       </div>
 
-      {/* Tab 1: Journal Entries (PRD Section 13) */}
+      {/* ========================================================================= */}
+      {/* TAB: DAILY DAYBOOK & OPENING / CLOSING BALANCE HISTORY                     */}
+      {/* ========================================================================= */}
+      {activeTab === 'daily_daybook' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Top Live Daily Position KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            <div style={{ background: 'var(--bg-secondary)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Today's Opening Cash & Bank</div>
+              <div className="font-mono" style={{ fontSize: '18px', fontWeight: 900, color: 'var(--accent-cyan)', marginTop: '2px' }}>
+                ₹{todayRecord?.openCashBank.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>Carried forward from yesterday</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Today's Sales Invoiced</div>
+              <div className="font-mono" style={{ fontSize: '18px', fontWeight: 900, color: 'var(--accent-orange-bright)', marginTop: '2px' }}>
+                ₹{todayRecord?.grossSalesBilled.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>{todayRecord?.dayInvoices.length} bill(s) generated today</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Today's Collections Received</div>
+              <div className="font-mono" style={{ fontSize: '18px', fontWeight: 900, color: '#10B981', marginTop: '2px' }}>
+                +₹{todayRecord?.receiptsCollected.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>NEFT / UPI / Cash Inflow</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Today's Closing Cash & Bank</div>
+              <div className="font-mono" style={{ fontSize: '18px', fontWeight: 900, color: '#FFFFFF', marginTop: '2px' }}>
+                ₹{todayRecord?.closingCashBank.toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#10B981', marginTop: '3px', fontWeight: 600 }}>
+                Net Day Cashflow: {todayRecord?.netMovement >= 0 ? `+₹${todayRecord?.netMovement.toLocaleString('en-IN')}` : `-₹${Math.abs(todayRecord?.netMovement).toLocaleString('en-IN')}`}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg-secondary)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Receivables (Debtors)</div>
+              <div className="font-mono" style={{ fontSize: '18px', fontWeight: 900, color: '#EF4444', marginTop: '2px' }}>
+                ₹{totalReceivablesDue.toLocaleString('en-IN')} Dr
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>Outstanding Across All Customers</div>
+            </div>
+          </div>
+
+          {/* Everyday Basis Balance History Register Table */}
+          <div className="enterprise-table-container">
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#FFF' }}>
+                  Daily Balance Register & Cashflow History List
+                </h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Day-by-day opening balance, billed sales, collections, disbursements, and closing balances
+                </div>
+              </div>
+              <span className="status-pill status-pill-cyan" style={{ fontSize: '10px' }}>
+                {dailyDaybookHistory.length} DAYS AUDITED
+              </span>
+            </div>
+
+            <table className="enterprise-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '36px' }}></th>
+                  <th style={{ minWidth: '150px' }}>Day & Date</th>
+                  <th style={{ textAlign: 'right', minWidth: '130px' }}>Opening Balance (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '130px' }}>Sales Billed (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '130px' }}>Receipts Inflow (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '130px' }}>Payouts Outflow (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '130px' }}>Net Movement (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '140px', background: 'rgba(255, 107, 0, 0.08)' }}>Closing Balance (₹)</th>
+                  <th style={{ textAlign: 'right', minWidth: '140px' }}>Closing Debtors (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyDaybookHistory.map((day) => {
+                  const isExpanded = expandedDayDate === day.date;
+                  return (
+                    <React.Fragment key={day.date}>
+                      <tr 
+                        onClick={() => setExpandedDayDate(isExpanded ? null : day.date)}
+                        style={{
+                          cursor: 'pointer',
+                          background: isExpanded ? 'rgba(255, 107, 0, 0.08)' : undefined,
+                          borderLeft: day.date === getTodayISODate() ? '3px solid var(--accent-orange)' : undefined
+                        }}
+                      >
+                        <td style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 800, color: day.date === getTodayISODate() ? 'var(--accent-orange-bright)' : '#FFF' }}>
+                            {day.formattedDate}
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                            {day.dayLabel} • {day.voucherCount} Activity Item(s)
+                          </div>
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          ₹{day.openCashBank.toLocaleString('en-IN')}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 700, color: day.grossSalesBilled > 0 ? 'var(--accent-orange-bright)' : 'inherit' }}>
+                          {day.grossSalesBilled > 0 ? `₹${day.grossSalesBilled.toLocaleString('en-IN')}` : '-'}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 700, color: day.receiptsCollected > 0 ? '#10B981' : 'inherit' }}>
+                          {day.receiptsCollected > 0 ? `+₹${day.receiptsCollected.toLocaleString('en-IN')}` : '-'}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 700, color: day.payoutsOutflow > 0 ? '#EF4444' : 'inherit' }}>
+                          {day.payoutsOutflow > 0 ? `-₹${day.payoutsOutflow.toLocaleString('en-IN')}` : '-'}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 800, color: day.netMovement >= 0 ? '#10B981' : '#EF4444' }}>
+                          {day.netMovement > 0 ? `+₹${day.netMovement.toLocaleString('en-IN')}` : day.netMovement < 0 ? `-₹${Math.abs(day.netMovement).toLocaleString('en-IN')}` : '₹0'}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 900, color: '#FFFFFF', background: 'rgba(255, 107, 0, 0.04)' }}>
+                          ₹{day.closingCashBank.toLocaleString('en-IN')}
+                        </td>
+                        <td className="font-mono" style={{ textAlign: 'right', fontWeight: 800, color: '#EF4444' }}>
+                          ₹{day.closingDebtors.toLocaleString('en-IN')} Dr
+                        </td>
+                      </tr>
+
+                      {/* Drilldown Sub-Table for this specific Day */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={9} style={{ padding: '0', background: 'rgba(0, 0, 0, 0.35)' }}>
+                            <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-orange-bright)' }}>
+                                  Itemized Vouchers & Bills for {day.formattedDate}:
+                                </span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                                  Day Opening: ₹{day.openCashBank.toLocaleString('en-IN')} ➔ Day Closing: ₹{day.closingCashBank.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              {day.dayInvoices.length === 0 && day.dayJournals.length === 0 ? (
+                                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', padding: '8px 0' }}>
+                                  No transaction vouchers recorded on this date. Balances carried forward intact.
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                  {/* Invoices List */}
+                                  {day.dayInvoices.map((inv, iIdx) => (
+                                    <div 
+                                      key={iIdx}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        background: 'var(--bg-secondary)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-subtle)',
+                                        fontSize: '11.5px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span className="status-pill status-pill-orange" style={{ fontSize: '9px' }}>TAX INVOICE</span>
+                                        <span className="font-mono" style={{ fontWeight: 800, color: '#FFF' }}>#{inv.invoiceNumber}</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Billed To: <strong style={{ color: '#FFF' }}>{inv.customer.partyName}</strong></span>
+                                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>({inv.lineItems.length} SKUs • {inv.paymentMode})</span>
+                                      </div>
+
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Taxable: ₹{inv.subtotalTaxable.toLocaleString('en-IN')}</span>
+                                        <span className="font-mono" style={{ fontWeight: 900, color: 'var(--accent-orange-bright)' }}>
+                                          Total: ₹{inv.grandTotal.toLocaleString('en-IN')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  {/* Journal Entries List */}
+                                  {day.dayJournals.map((je, jIdx) => (
+                                    <div 
+                                      key={jIdx}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        background: 'var(--bg-secondary)',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-subtle)',
+                                        fontSize: '11.5px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span className={`status-pill ${je.voucherType === 'Receipt' ? 'status-pill-success' : 'status-pill-cyan'}`} style={{ fontSize: '9px' }}>
+                                          {je.voucherType.toUpperCase()} VOUCHER
+                                        </span>
+                                        <span className="font-mono" style={{ fontWeight: 800, color: '#FFF' }}>{je.entryNumber}</span>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{je.description}</span>
+                                      </div>
+
+                                      <div className="font-mono" style={{ fontWeight: 900, color: je.voucherType === 'Receipt' ? '#10B981' : '#FFF' }}>
+                                        ₹{je.totalDebit.toLocaleString('en-IN')}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      )}
+
+      {/* Tab: Journal Entries */}
       {activeTab === 'journal_entries' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* Date Filter Bar */}
           <div className="glass-panel" style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', background: 'rgba(255, 107, 0, 0.03)', borderColor: 'rgba(255, 107, 0, 0.2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--accent-orange-bright)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CalendarIcon size={14} /> FILTER VOUCHERS BY DATE:
+                <Calendar size={14} /> FILTER VOUCHERS BY DATE:
               </span>
               {(['ALL', 'TODAY', 'YESTERDAY', 'LAST_7_DAYS', 'THIS_MONTH'] as const).map(df => (
                 <button
@@ -430,7 +763,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                     cursor: 'pointer'
                   }}
                 >
-                  {df === 'ALL' ? 'All Dates' : df === 'TODAY' ? 'Today (15 Aug)' : df === 'YESTERDAY' ? 'Yesterday (14 Aug)' : df === 'LAST_7_DAYS' ? 'Last 7 Days' : 'This Month (Aug 2026)'}
+                  {df === 'ALL' ? 'All Dates' : df === 'TODAY' ? `Today (${getTodayFormatted()})` : df === 'YESTERDAY' ? `Yesterday (${getYesterdayFormatted()})` : df === 'LAST_7_DAYS' ? 'Last 7 Days' : `This Month (${getCurrentMonthFormatted()})`}
                 </button>
               ))}
             </div>
@@ -450,6 +783,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                   <th>Voucher Type</th>
                   <th style={{ textAlign: 'right' }}>Total Debit (₹)</th>
                   <th style={{ textAlign: 'right' }}>Total Credit (₹)</th>
+                  <th>Integrity Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -471,7 +805,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                           </td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <CalendarIcon size={12} color="var(--accent-orange)" />
+                              <Calendar size={12} color="var(--accent-orange)" />
                               <span style={{ fontWeight: 600, color: '#FFF' }}>{formatDate(je.date)}</span>
                             </div>
                             <div style={{ fontSize: '10px', color: 'var(--accent-orange-bright)', fontWeight: 500 }}>
@@ -490,346 +824,85 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                           <td className="font-mono" style={{ textAlign: 'right', fontWeight: 800, color: '#10B981' }}>
                             ₹{je.totalCredit.toLocaleString('en-IN')}
                           </td>
-                        </tr>
-
-                      {/* Expandable Multi-Line Breakdown */}
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={7} style={{ background: 'var(--bg-primary)', padding: '16px 24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                              DOUBLE-ENTRY JOURNAL LINES:
-                            </div>
-                            <table style={{ width: '100%', fontSize: '11.5px', borderCollapse: 'collapse' }}>
-                              <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Account Particulars</th>
-                                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Group</th>
-                                  <th style={{ padding: '6px 8px', textAlign: 'right', width: '120px' }}>Debit (₹)</th>
-                                  <th style={{ padding: '6px 8px', textAlign: 'right', width: '120px' }}>Credit (₹)</th>
-                                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>Line Memo / Narration</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {je.lines.map((ln) => (
-                                  <tr key={ln.id} style={{ borderBottom: '1px dashed var(--border-subtle)' }}>
-                                    <td style={{ padding: '6px 8px', fontWeight: 700, color: '#FFF' }}>{ln.accountName}</td>
-                                    <td style={{ padding: '6px 8px', color: 'var(--text-secondary)', fontSize: '10.5px' }}>{ln.accountGroup}</td>
-                                    <td className="font-mono" style={{ padding: '6px 8px', textAlign: 'right', fontWeight: ln.debit > 0 ? 800 : 400, color: ln.debit > 0 ? '#FFF' : 'inherit' }}>
-                                      {ln.debit > 0 ? `₹${ln.debit.toLocaleString('en-IN')}` : '-'}
-                                    </td>
-                                    <td className="font-mono" style={{ padding: '6px 8px', textAlign: 'right', fontWeight: ln.credit > 0 ? 800 : 400, color: ln.credit > 0 ? '#10B981' : 'inherit' }}>
-                                      {ln.credit > 0 ? `₹${ln.credit.toLocaleString('en-IN')}` : '-'}
-                                    </td>
-                                    <td style={{ padding: '6px 8px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>{ln.memo}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          <td>
+                            <span className="status-pill status-pill-success">
+                              <CheckCircle2 size={10} /> POSTED
+                            </span>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={8} style={{ padding: '0', background: 'rgba(0, 0, 0, 0.25)' }}>
+                              <div style={{ padding: '14px 20px' }}>
+                                <table style={{ width: '100%', fontSize: '11.5px', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>
+                                      <th style={{ textAlign: 'left', padding: '6px' }}>Account Code & Name</th>
+                                      <th style={{ textAlign: 'left', padding: '6px' }}>Group</th>
+                                      <th style={{ textAlign: 'right', padding: '6px', width: '120px' }}>Debit (₹)</th>
+                                      <th style={{ textAlign: 'right', padding: '6px', width: '120px' }}>Credit (₹)</th>
+                                      <th style={{ textAlign: 'left', padding: '6px' }}>Line Memo</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {je.lines.map((l) => (
+                                      <tr key={l.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}>
+                                        <td style={{ padding: '6px', fontWeight: 600, color: '#FFF' }}>
+                                          {l.accountId} - {l.accountName}
+                                        </td>
+                                        <td style={{ padding: '6px', color: 'var(--text-secondary)' }}>{l.accountGroup}</td>
+                                        <td className="font-mono" style={{ textAlign: 'right', padding: '6px', fontWeight: l.debit > 0 ? 700 : 400 }}>
+                                          {l.debit > 0 ? `₹${l.debit.toLocaleString('en-IN')}` : '-'}
+                                        </td>
+                                        <td className="font-mono" style={{ textAlign: 'right', padding: '6px', fontWeight: l.credit > 0 ? 700 : 400, color: l.credit > 0 ? '#10B981' : 'inherit' }}>
+                                          {l.credit > 0 ? `₹${l.credit.toLocaleString('en-IN')}` : '-'}
+                                        </td>
+                                        <td style={{ padding: '6px', color: 'var(--text-tertiary)' }}>{l.memo}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Trial Balance (PRD Section 14) */}
-      {activeTab === 'trial_balance' && (
-        <div className="enterprise-table-container">
-          <div style={{ padding: '14px 18px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '14px', color: '#FFF' }}>
-                {activeCompany.companyName} — Chart of Accounts Trial Balance
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                Double-Entry Balance Verification for Month Ended August 2026 (17 Accounts)
-              </div>
-            </div>
-            <span className="status-pill status-pill-success">
-              100% IN EQUILIBRIUM (₹0.00 DIFFERENCE)
-            </span>
-          </div>
-
-          <table className="enterprise-table">
-            <thead>
-              <tr>
-                <th>Account Code</th>
-                <th>Account Name</th>
-                <th>Classification</th>
-                <th style={{ textAlign: 'right' }}>Debit Balance (₹)</th>
-                <th style={{ textAlign: 'right' }}>Credit Balance (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { code: '10000', name: 'Cash in Hand (Factory Counter)', type: 'Asset', dr: 465000, cr: 0 },
-                { code: '10001', name: 'HDFC Operating Bank Account', type: 'Asset', dr: 1000000, cr: 0 },
-                { code: '12000', name: 'Accounts Receivable (Sundry Debtors)', type: 'Asset', dr: 270000, cr: 0 },
-                { code: '13000', name: 'Polymer Finished Goods Inventory', type: 'Asset', dr: 300000, cr: 0 },
-                { code: '14000', name: 'Fixed Assets (Injection Moulding Machines)', type: 'Asset', dr: 500000, cr: 0 },
-                { code: '20000', name: 'Accounts Payable (Polymer Suppliers)', type: 'Liability', dr: 0, cr: 150000 },
-                { code: '21000', name: 'GST Payable (Duties & Taxes)', type: 'Liability', dr: 0, cr: 85000 },
-                { code: '30000', name: "Owner's Capital & Reserves", type: 'Equity', dr: 0, cr: 1800000 },
-                { code: '31000', name: 'Retained Earnings', type: 'Equity', dr: 0, cr: 200000 },
-                { code: '40000', name: 'Domestic Plastic Sales Revenue', type: 'Revenue', dr: 0, cr: 1250000 },
-                { code: '50000', name: 'Cost of Goods Sold (Raw PP Granules)', type: 'Expense', dr: 450000, cr: 0 },
-                { code: '51000', name: 'Salaries & Factory Wages Expense', type: 'Expense', dr: 120000, cr: 0 },
-                { code: '52000', name: 'Factory & Warehouse Rent Expense', type: 'Expense', dr: 35000, cr: 0 },
-                { code: '53000', name: 'Power & Utilities Expense', type: 'Expense', dr: 8500, cr: 0 },
-                { code: '54000', name: 'Marketing & Transport Freight', type: 'Expense', dr: 15000, cr: 0 },
-                { code: '55000', name: 'Purchase of Ancillary Materials', type: 'Expense', dr: 455000, cr: 0 }
-              ].map((row, idx) => (
-                <tr key={idx}>
-                  <td className="font-mono" style={{ color: 'var(--accent-orange-bright)', fontWeight: 600 }}>{row.code}</td>
-                  <td style={{ fontWeight: 600 }}>{row.name}</td>
-                  <td>
-                    <span className="status-pill status-pill-cyan" style={{ fontSize: '9px' }}>
-                      {row.type}
-                    </span>
-                  </td>
-                  <td className="font-mono" style={{ textAlign: 'right', fontWeight: row.dr > 0 ? 700 : 400 }}>
-                    {row.dr > 0 ? `₹${row.dr.toLocaleString('en-IN')}` : '-'}
-                  </td>
-                  <td className="font-mono" style={{ textAlign: 'right', fontWeight: row.cr > 0 ? 700 : 400, color: row.cr > 0 ? '#10B981' : 'inherit' }}>
-                    {row.cr > 0 ? `₹${row.cr.toLocaleString('en-IN')}` : '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr style={{ background: 'var(--bg-tertiary)', fontWeight: 900 }}>
-                <td colSpan={3} style={{ textAlign: 'right', padding: '14px 16px', color: '#FFF' }}>TRIAL BALANCE GRAND EQUILIBRIUM:</td>
-                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981', fontSize: '14px' }}>₹31,13,500</td>
-                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981', fontSize: '14px' }}>₹31,13,500</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-
-      {/* Tab 3: Profit & Loss Statement (PRD Section 15) */}
-      {activeTab === 'profit_loss' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* KPI Header Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Total Revenue (Sales)</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 900, color: '#10B981', marginTop: '2px' }}>₹12,50,000</div>
-            </div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Total Operating Costs</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 900, color: '#EF4444', marginTop: '2px' }}>₹10,83,500</div>
-            </div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', border: '1px solid var(--accent-orange-border)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--accent-orange-bright)' }}>Net Operating Profit</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 900, color: 'var(--accent-orange-bright)', marginTop: '2px' }}>₹1,66,500</div>
-            </div>
-            <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Profit Margin %</div>
-              <div className="font-mono" style={{ fontSize: '22px', fontWeight: 900, color: '#00E5FF', marginTop: '2px' }}>13.32%</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            {/* Revenue Accounts */}
-            <div className="glass-panel" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#10B981', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '12px' }}>
-                REVENUE / OPERATING INCOME
-              </div>
-              <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '8px 0', color: '#FFF' }}>40000 - Domestic Plastic Sales Revenue</td>
-                    <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹12,50,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '8px 0', color: '#FFF' }}>41000 - Service & Ancillary Revenue</td>
-                    <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹0.00</td>
-                  </tr>
-                  <tr style={{ fontWeight: 900, borderTop: '2px solid var(--border-medium)' }}>
-                    <td style={{ padding: '10px 0', color: '#FFF' }}>TOTAL REVENUE:</td>
-                    <td className="font-mono" style={{ padding: '10px 0', textAlign: 'right', color: '#10B981', fontSize: '14px' }}>₹12,50,000.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Expense Accounts */}
-            <div className="glass-panel" style={{ padding: '20px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#EF4444', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '12px' }}>
-                EXPENSES & DIRECT MANUFACTURING
-              </div>
-              <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>50000 - Cost of Goods Sold (Raw Granules)</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹4,50,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>51000 - Salaries & Factory Wages</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹1,20,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>52000 - Rent Expense (SIPCOT Estate)</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹35,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>53000 - Utilities & High-Tension Power</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹8,500.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>54000 - Marketing & Distribution Freight</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹15,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>55000 - Purchase of Goods (Packaging)</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹4,55,000.00</td>
-                  </tr>
-                  <tr style={{ fontWeight: 900, borderTop: '2px solid var(--border-medium)' }}>
-                    <td style={{ padding: '10px 0', color: '#FFF' }}>TOTAL EXPENSES:</td>
-                    <td className="font-mono" style={{ padding: '10px 0', textAlign: 'right', color: '#EF4444', fontSize: '14px' }}>₹10,83,500.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Balance Sheet (PRD Section 16) */}
-      {activeTab === 'balance_sheet' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '16px' }}>
-          {/* Assets Column */}
-          <div className="glass-panel" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: '#00E5FF' }}>
-                ASSETS (WHAT DMK OWNS)
-              </span>
-              <span className="status-pill status-pill-cyan" style={{ fontSize: '9px' }}>DEBIT NATURE</span>
-            </div>
-
-            <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '8px 0', color: '#FFF' }}>10000 - Cash in Hand</td>
-                  <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹4,65,000.00</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '8px 0', color: '#FFF' }}>10001 - Bank Account (HDFC/ICICI)</td>
-                  <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹10,00,000.00</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '8px 0', color: '#FFF' }}>12000 - Accounts Receivable (Customer Debtors)</td>
-                  <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹2,70,000.00</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '8px 0', color: '#FFF' }}>13000 - Raw & Moulded Inventory</td>
-                  <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹3,00,000.00</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  <td style={{ padding: '8px 0', color: '#FFF' }}>14000 - Fixed Assets (Moulding Plant)</td>
-                  <td className="font-mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700 }}>₹5,00,000.00</td>
-                </tr>
-                <tr style={{ fontWeight: 900, borderTop: '2px solid var(--border-medium)', background: 'var(--bg-tertiary)' }}>
-                  <td style={{ padding: '12px 10px', color: '#FFF' }}>TOTAL ASSETS:</td>
-                  <td className="font-mono" style={{ padding: '12px 10px', textAlign: 'right', color: '#00E5FF', fontSize: '15px' }}>
-                    ₹25,35,000.00
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Liabilities & Equity Column */}
-          <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#EF4444' }}>
-                  LIABILITIES (WHAT DMK OWES)
-                </span>
-              </div>
-              <table style={{ width: '100%', fontSize: '11.5px', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>20000 - Accounts Payable (Creditors)</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹1,50,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>21000 - GST Payable (Duties & Taxes)</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹85,000.00</td>
-                  </tr>
-                  <tr style={{ fontWeight: 700 }}>
-                    <td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>Total Liabilities:</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right', color: '#EF4444' }}>₹2,35,000.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: '#10B981' }}>
-                  EQUITY & OWNER CAPITAL
-                </span>
-              </div>
-              <table style={{ width: '100%', fontSize: '11.5px', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>30000 - Owner's Capital</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹18,00,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: '#FFF' }}>31000 - Retained Earnings</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right' }}>₹2,00,000.00</td>
-                  </tr>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '6px 0', color: 'var(--accent-orange-bright)', fontWeight: 700 }}>
-                      Current Period Profit (from P&L)
-                    </td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right', color: 'var(--accent-orange-bright)', fontWeight: 700 }}>
-                      ₹1,66,500.00
-                    </td>
-                  </tr>
-                  <tr style={{ fontWeight: 700 }}>
-                    <td style={{ padding: '6px 0', color: 'var(--text-secondary)' }}>Total Equity:</td>
-                    <td className="font-mono" style={{ padding: '6px 0', textAlign: 'right', color: '#10B981' }}>₹21,66,500.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ marginTop: 'auto', background: 'var(--bg-tertiary)', padding: '12px 14px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 900, color: '#FFF' }}>TOTAL LIABILITIES & EQUITY:</span>
-              <span className="font-mono" style={{ fontSize: '15px', fontWeight: 900, color: '#10B981' }}>
-                ₹24,01,500.00
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Party Ledger */}
+      {/* Tab: Customer Party Ledger */}
       {activeTab === 'party_ledger' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="glass-panel" style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="glass-panel" style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>SELECT CUSTOMER / DEBTOR:</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>SELECT CUSTOMER / DEBTOR:</span>
               <select 
                 value={selectedPartyId} 
                 onChange={e => setSelectedPartyId(e.target.value)}
                 className="form-input"
-                style={{ width: 'auto', minWidth: '320px' }}
+                style={{ width: 'auto', minWidth: '280px', fontWeight: 700 }}
               >
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.partyName} ({c.city}) - Balance: ₹{c.outstandingBalance.toLocaleString('en-IN')} {c.balanceType}
+                    {c.partyName} ({c.city}) — Outstanding: ₹{c.outstandingBalance.toLocaleString('en-IN')} {c.balanceType}
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>CLOSING BALANCE:</span>
+                <div className="font-mono" style={{ fontSize: '16px', fontWeight: 900, color: closingBalance > 0 ? '#EF4444' : '#10B981' }}>
+                  ₹{Math.abs(closingBalance).toLocaleString('en-IN')} {closingBalance >= 0 ? 'Dr' : 'Cr'}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -837,7 +910,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
             <table className="enterprise-table">
               <thead>
                 <tr>
-                  <th>Voucher Date</th>
+                  <th>Date</th>
                   <th>Voucher Number</th>
                   <th>Voucher Type</th>
                   <th>Particulars / Transaction Memo</th>
@@ -851,7 +924,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                   <tr key={row.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <CalendarIcon size={12} color="var(--accent-orange)" />
+                        <Calendar size={12} color="var(--accent-orange)" />
                         <span style={{ fontWeight: 600, color: '#FFF' }}>{formatDate(row.date)}</span>
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--accent-orange-bright)', fontWeight: 500 }}>
@@ -882,7 +955,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
               </tbody>
               <tfoot>
                 <tr style={{ background: 'var(--bg-tertiary)', fontWeight: 800 }}>
-                  <td colSpan={4} style={{ textAlign: 'right', padding: '12px 16px', color: '#FFF' }}>CLOSING BALANCE:</td>
+                  <td colSpan={4} style={{ textAlign: 'right', padding: '12px 16px', color: '#FFF' }}>TOTAL:</td>
                   <td className="font-mono" style={{ textAlign: 'right', color: '#FFF' }}>₹{totalDr.toLocaleString('en-IN')}</td>
                   <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>₹{totalCr.toLocaleString('en-IN')}</td>
                   <td className="font-mono" style={{ textAlign: 'right', color: 'var(--accent-orange-bright)' }}>
@@ -895,7 +968,270 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
         </div>
       )}
 
-      {/* New Journal Entry Modal with Live Debit = Credit Validation */}
+      {/* Tab: Trial Balance */}
+      {activeTab === 'trial_balance' && (
+        <div className="enterprise-table-container">
+          <table className="enterprise-table">
+            <thead>
+              <tr>
+                <th>Account Code</th>
+                <th>Account Description</th>
+                <th>Classification</th>
+                <th style={{ textAlign: 'right' }}>Debit Balance (₹)</th>
+                <th style={{ textAlign: 'right' }}>Credit Balance (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td className="font-mono">10000</td><td style={{ fontWeight: 600 }}>Cash in Hand (Counter)</td><td>Asset</td><td className="font-mono" style={{ textAlign: 'right' }}>₹4,65,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+              <tr><td className="font-mono">10001</td><td style={{ fontWeight: 600 }}>HDFC Operating Bank Account</td><td>Asset</td><td className="font-mono" style={{ textAlign: 'right' }}>₹10,00,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+              <tr><td className="font-mono">12000</td><td style={{ fontWeight: 600 }}>Accounts Receivable (Sundry Debtors)</td><td>Asset</td><td className="font-mono" style={{ textAlign: 'right' }}>₹2,70,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+              <tr><td className="font-mono">13000</td><td style={{ fontWeight: 600 }}>Finished Moulded Inventory</td><td>Asset</td><td className="font-mono" style={{ textAlign: 'right' }}>₹3,00,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+              <tr><td className="font-mono">14000</td><td style={{ fontWeight: 600 }}>Fixed Assets (Machinery Plant)</td><td>Asset</td><td className="font-mono" style={{ textAlign: 'right' }}>₹5,00,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+              <tr><td className="font-mono">20000</td><td style={{ fontWeight: 600 }}>Accounts Payable (Suppliers)</td><td>Liability</td><td style={{ textAlign: 'right' }}>-</td><td className="font-mono" style={{ textAlign: 'right' }}>₹1,50,000</td></tr>
+              <tr><td className="font-mono">21000</td><td style={{ fontWeight: 600 }}>GST Payable (Duties & Taxes)</td><td>Liability</td><td style={{ textAlign: 'right' }}>-</td><td className="font-mono" style={{ textAlign: 'right' }}>₹85,000</td></tr>
+              <tr><td className="font-mono">30000</td><td style={{ fontWeight: 600 }}>Owner's Capital & Reserves</td><td>Equity</td><td style={{ textAlign: 'right' }}>-</td><td className="font-mono" style={{ textAlign: 'right' }}>₹18,00,000</td></tr>
+              <tr><td className="font-mono">31000</td><td style={{ fontWeight: 600 }}>Retained Earnings</td><td>Equity</td><td style={{ textAlign: 'right' }}>-</td><td className="font-mono" style={{ textAlign: 'right' }}>₹2,00,000</td></tr>
+              <tr><td className="font-mono">40000</td><td style={{ fontWeight: 600 }}>Domestic Plastic Sales Revenue</td><td>Revenue</td><td style={{ textAlign: 'right' }}>-</td><td className="font-mono" style={{ textAlign: 'right' }}>₹4,20,000</td></tr>
+              <tr><td className="font-mono">50000</td><td style={{ fontWeight: 600 }}>Cost of Goods Sold (Raw Polymer)</td><td>Expense</td><td className="font-mono" style={{ textAlign: 'right' }}>₹1,20,000</td><td style={{ textAlign: 'right' }}>-</td></tr>
+            </tbody>
+            <tfoot>
+              <tr style={{ background: 'var(--bg-tertiary)', fontWeight: 900 }}>
+                <td colSpan={3} style={{ textAlign: 'right', color: '#FFF' }}>TRIAL BALANCE TOTALS:</td>
+                <td className="font-mono" style={{ textAlign: 'right', color: 'var(--accent-orange-bright)' }}>₹26,55,000</td>
+                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>₹26,55,000</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Tab: Profit & Loss */}
+      {activeTab === 'profit_loss' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="enterprise-table-container">
+            <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.08)', fontWeight: 800, color: '#EF4444' }}>
+              EXPENSES (DEBIT)
+            </div>
+            <table className="enterprise-table">
+              <tbody>
+                <tr><td>Cost of Goods Sold (Raw Polymer)</td><td className="font-mono" style={{ textAlign: 'right' }}>₹1,20,000</td></tr>
+                <tr><td>Salaries & Factory Wages</td><td className="font-mono" style={{ textAlign: 'right' }}>₹95,000</td></tr>
+                <tr><td>Factory & Warehouse Rent</td><td className="font-mono" style={{ textAlign: 'right' }}>₹35,000</td></tr>
+                <tr><td>Power, Fuel & Electricity</td><td className="font-mono" style={{ textAlign: 'right' }}>₹28,500</td></tr>
+                <tr><td>Marketing & Transport Freight</td><td className="font-mono" style={{ textAlign: 'right' }}>₹20,000</td></tr>
+                <tr style={{ fontWeight: 900, background: 'var(--bg-tertiary)' }}>
+                  <td>TOTAL EXPENSES:</td><td className="font-mono" style={{ textAlign: 'right', color: '#EF4444' }}>₹2,98,500</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="enterprise-table-container">
+            <div style={{ padding: '12px 16px', background: 'rgba(16, 185, 129, 0.08)', fontWeight: 800, color: '#10B981' }}>
+              REVENUES & INCOME (CREDIT)
+            </div>
+            <table className="enterprise-table">
+              <tbody>
+                <tr><td>Domestic Plastic Sales Revenue</td><td className="font-mono" style={{ textAlign: 'right' }}>₹4,20,000</td></tr>
+                <tr><td>Moulding Job Work Income</td><td className="font-mono" style={{ textAlign: 'right' }}>₹45,000</td></tr>
+                <tr style={{ fontWeight: 900, background: 'var(--bg-tertiary)' }}>
+                  <td>TOTAL REVENUE:</td><td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>₹4,65,000</td>
+                </tr>
+                <tr style={{ fontWeight: 900, background: 'rgba(255, 107, 0, 0.15)', borderTop: '2px solid var(--accent-orange)' }}>
+                  <td style={{ color: 'var(--accent-orange-bright)' }}>NET OPERATING PROFIT:</td>
+                  <td className="font-mono" style={{ textAlign: 'right', color: 'var(--accent-orange-bright)', fontSize: '14px' }}>
+                    ₹1,66,500
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Balance Sheet */}
+      {activeTab === 'balance_sheet' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="enterprise-table-container">
+            <div style={{ padding: '12px 16px', background: 'rgba(2, 132, 199, 0.08)', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+              ASSETS
+            </div>
+            <table className="enterprise-table">
+              <tbody>
+                <tr><td>10000 - Cash in Hand</td><td className="font-mono" style={{ textAlign: 'right' }}>₹4,65,000</td></tr>
+                <tr><td>10001 - HDFC Operating Bank Account</td><td className="font-mono" style={{ textAlign: 'right' }}>₹10,00,000</td></tr>
+                <tr><td>12000 - Accounts Receivable (Debtors)</td><td className="font-mono" style={{ textAlign: 'right' }}>₹2,70,000</td></tr>
+                <tr><td>13000 - Moulded Finished Inventory</td><td className="font-mono" style={{ textAlign: 'right' }}>₹3,00,000</td></tr>
+                <tr><td>14000 - Fixed Machinery Plant</td><td className="font-mono" style={{ textAlign: 'right' }}>₹5,00,000</td></tr>
+                <tr style={{ fontWeight: 900, background: 'var(--bg-tertiary)' }}>
+                  <td>TOTAL ASSETS:</td><td className="font-mono" style={{ textAlign: 'right', color: 'var(--accent-cyan)' }}>₹25,35,000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="enterprise-table-container">
+            <div style={{ padding: '12px 16px', background: 'rgba(245, 158, 11, 0.08)', fontWeight: 800, color: 'var(--accent-amber)' }}>
+              LIABILITIES & EQUITY
+            </div>
+            <table className="enterprise-table">
+              <tbody>
+                <tr><td>20000 - Accounts Payable</td><td className="font-mono" style={{ textAlign: 'right' }}>₹1,50,000</td></tr>
+                <tr><td>21000 - GST Payable Duties</td><td className="font-mono" style={{ textAlign: 'right' }}>₹85,000</td></tr>
+                <tr><td>30000 - Owner's Capital</td><td className="font-mono" style={{ textAlign: 'right' }}>₹18,00,000</td></tr>
+                <tr><td>31000 - Retained Earnings</td><td className="font-mono" style={{ textAlign: 'right' }}>₹2,00,000</td></tr>
+                <tr><td>Current Net Profit (from P&L)</td><td className="font-mono" style={{ textAlign: 'right' }}>₹1,66,500</td></tr>
+                <tr style={{ fontWeight: 900, background: 'var(--bg-tertiary)' }}>
+                  <td>TOTAL LIABILITIES & EQUITY:</td><td className="font-mono" style={{ textAlign: 'right', color: 'var(--accent-amber)' }}>₹24,01,500</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: RECORD CUSTOMER PAYMENT RECEIPT                                  */}
+      {/* ========================================================================= */}
+      {showPaymentReceiptModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(5, 7, 10, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => setShowPaymentReceiptModal(false)}
+        >
+          <div 
+            className="glass-panel"
+            style={{
+              width: '100%',
+              maxWidth: '560px',
+              backgroundColor: 'var(--bg-secondary)',
+              color: '#FFF',
+              padding: '24px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-medium)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.9)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>
+                  Record Customer Collection / Payment Receipt
+                </h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  Direct Cash/Bank Inflow • Immediately updates Daybook and Customer Ledger
+                </div>
+              </div>
+              <button onClick={() => setShowPaymentReceiptModal(false)} className="btn-secondary" style={{ padding: '4px 8px' }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordPaymentSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label className="form-label">SELECT CUSTOMER ACCOUNT *</label>
+                <select 
+                  value={payCustId}
+                  onChange={e => setPayCustId(e.target.value)}
+                  className="form-input"
+                  style={{ fontWeight: 600 }}
+                >
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.partyName} (Due: ₹{c.outstandingBalance.toLocaleString('en-IN')} {c.balanceType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label">RECEIVED AMOUNT (₹) *</label>
+                  <input 
+                    type="number"
+                    required
+                    value={payAmount}
+                    onChange={e => setPayAmount(parseFloat(e.target.value) || 0)}
+                    className="form-input font-mono"
+                    style={{ fontSize: '15px', fontWeight: 800, color: '#10B981' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">PAYMENT SETTLEMENT MODE</label>
+                  <select 
+                    value={payMode}
+                    onChange={e => setPayMode(e.target.value as any)}
+                    className="form-input"
+                  >
+                    <option value="NEFT_RTGS">Bank NEFT / RTGS (HDFC)</option>
+                    <option value="UPI">Instant UPI Transfer</option>
+                    <option value="CASH">Cash Counter Receipt</option>
+                    <option value="CHEQUE">Bank Cheque Clearing</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label">BANK REF / UTR / TRANSACTION ID</label>
+                  <input 
+                    type="text"
+                    required
+                    value={payRef}
+                    onChange={e => setPayRef(e.target.value)}
+                    className="form-input font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">RECEIPT DATE</label>
+                  <input 
+                    type="date"
+                    value={payDate}
+                    onChange={e => setPayDate(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">RECEIPT NARRATION / NOTES</label>
+                <input 
+                  type="text"
+                  value={payNotes}
+                  onChange={e => setPayNotes(e.target.value)}
+                  className="form-input"
+                  placeholder="e.g. Cleared bill #4018 against August dispatch"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1, padding: '12px' }}>
+                  <Receipt size={15} />
+                  <span>Post Collection & Update Daybook</span>
+                </button>
+                <button type="button" onClick={() => setShowPaymentReceiptModal(false)} className="btn-secondary" style={{ padding: '12px 18px' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: NEW JOURNAL ENTRY                                                */}
+      {/* ========================================================================= */}
       {showNewEntryModal && (
         <div 
           style={{
@@ -906,7 +1242,8 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999
+            zIndex: 9999,
+            padding: '20px'
           }}
           onClick={() => setShowNewEntryModal(false)}
         >
@@ -1103,6 +1440,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
           </div>
         </div>
       )}
+
     </div>
   );
 };

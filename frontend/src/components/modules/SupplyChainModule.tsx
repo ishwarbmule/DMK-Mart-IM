@@ -256,7 +256,7 @@ export const SupplyChainModule: React.FC = () => {
             style={{ width: '100%', padding: '12px' }}
           >
             <Sparkles size={16} />
-            <span>Generate Tier-1 Purchase Order ($12,500.00)</span>
+            <span>Generate Tier-1 Purchase Order (₹12,500.00)</span>
           </button>
         </div>
       </div>

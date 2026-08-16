@@ -1,9 +1,50 @@
 /**
- * DMK Mart Enterprise ERP - Universal Date Formatting & Filtering Utility
+ * DMK Mart Enterprise ERP - Universal Dynamic Date Formatting & Filtering Utility
+ * Automatically synchronizes with the system's real-time date (Today / Yesterday / Current Month / FY)
  */
 
+export const getTodayISODate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getOffsetISODate = (offsetDays: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const getTodayFormatted = (): string => {
+  return formatDate(new Date());
+};
+
+export const getYesterdayFormatted = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return formatDate(d);
+};
+
+export const getCurrentMonthFormatted = (): string => {
+  return new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+};
+
+export const getCurrentFinancialYear = (): string => {
+  const d = new Date();
+  const currentYear = d.getFullYear();
+  const currentMonth = d.getMonth(); // 0 = Jan, 3 = Apr
+  const startYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+  const endYear = (startYear + 1) % 100;
+  return `FY ${startYear}-${endYear.toString().padStart(2, '0')}`;
+};
+
 export const formatDate = (dateStr: string | Date | undefined): string => {
-  if (!dateStr) return 'N/A';
+  if (!dateStr) return formatDate(new Date());
   try {
     const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
     if (isNaN(d.getTime())) return String(dateStr);
@@ -12,14 +53,14 @@ export const formatDate = (dateStr: string | Date | undefined): string => {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
-    }); // e.g. "15 Aug 2026"
+    }); // e.g. "16 Aug 2026"
   } catch {
     return String(dateStr);
   }
 };
 
 export const formatFullDate = (dateStr: string | Date | undefined): string => {
-  if (!dateStr) return 'N/A';
+  if (!dateStr) return formatFullDate(new Date());
   try {
     const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
     if (isNaN(d.getTime())) return String(dateStr);
@@ -29,34 +70,31 @@ export const formatFullDate = (dateStr: string | Date | undefined): string => {
       day: '2-digit',
       month: 'long',
       year: 'numeric'
-    }); // e.g. "Sat, 15 August 2026"
+    }); // e.g. "Sun, 16 August 2026"
   } catch {
     return String(dateStr);
   }
 };
 
 export const formatTaxInvoiceDate = (dateStr: string | undefined): string => {
-  if (!dateStr) return '15-08-2026';
   try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    const d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) return String(dateStr);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    return `${day}/${month}/${year}`; // e.g. "15/08/2026"
+    return `${day}/${month}/${year}`; // e.g. "16/08/2026"
   } catch {
-    return dateStr;
+    return dateStr || '';
   }
 };
 
 export const getRelativeDateLabel = (dateStr: string | undefined): string => {
-  if (!dateStr) return '';
-  const todayStr = new Date().toISOString().split('T')[0];
+  if (!dateStr) return 'Today';
+  const todayStr = getTodayISODate();
   if (dateStr === todayStr) return 'Today';
   
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yestStr = yesterday.toISOString().split('T')[0];
+  const yestStr = getOffsetISODate(-1);
   if (dateStr === yestStr) return 'Yesterday';
 
   return formatDate(dateStr);

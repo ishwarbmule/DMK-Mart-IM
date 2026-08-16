@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, DollarSign, ShieldCheck, CheckCircle2, FileSpreadsheet, Sparkles, Building2 } from 'lucide-react';
+import { Users, IndianRupee, ShieldCheck, CheckCircle2, FileSpreadsheet, Sparkles, Building2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { MOCK_EMPLOYEES } from '../../data/mockData';
 import { Employee } from '../../types/erp';
@@ -30,7 +30,7 @@ export const HRMPayrollModule: React.FC = () => {
       colors: ['#10B981', '#FF6B00', '#FFFFFF']
     });
 
-    setDisbursedNotice(`Successfully generated SEPA ISO 20022 / NACHA batch for ${employees.length} employees ($${(employees.reduce((acc, e) => acc + (e.salary / 26), 0)).toLocaleString()}).`);
+    setDisbursedNotice(`Successfully generated RBI NEFT / RTGS payout batch for ${employees.length} employees (₹${(employees.reduce((acc, e) => acc + (e.salary / 12), 0)).toLocaleString()}).`);
     setTimeout(() => setDisbursedNotice(null), 5000);
   };
 
@@ -142,9 +142,9 @@ export const HRMPayrollModule: React.FC = () => {
 
                 <div style={{ textAlign: 'right' }}>
                   <div className="font-mono" style={{ fontSize: '14px', fontWeight: 800, color: '#10B981' }}>
-                    ${emp.salary.toLocaleString()}
+                    ₹{emp.salary.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Annual USD Base</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Annual CTC (INR)</div>
                 </div>
               </div>
             ))}
@@ -157,43 +157,43 @@ export const HRMPayrollModule: React.FC = () => {
             <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFF' }}>
               Gross-to-Net Breakdown: <span style={{ color: 'var(--accent-orange)' }}>{activeEmp.name}</span>
             </span>
-            <span className="status-pill status-pill-success">BI-WEEKLY CYCLE</span>
+            <span className="status-pill status-pill-success">MONTHLY SALARY SLIP</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Bi-Weekly Gross Base Earnings</span>
-              <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${biweeklyGross.toFixed(2)}</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Monthly Gross Base Earnings</span>
+              <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{biweeklyGross.toFixed(2)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#FFB020' }}>
-              <span>Pre-Tax 401(k) & Section 125 Healthcare</span>
-              <span className="font-mono">-${preTaxDeductions.toFixed(2)}</span>
+              <span>Pre-Tax EPF & NPS Contribution</span>
+              <span className="font-mono">-₹{preTaxDeductions.toFixed(2)}</span>
             </div>
 
             <div style={{ borderTop: '1px dashed var(--border-subtle)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
               <span style={{ color: 'var(--text-secondary)' }}>Taxable Wage Base</span>
-              <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${taxableWageBase.toFixed(2)}</span>
+              <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{taxableWageBase.toFixed(2)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#EF4444' }}>
-              <span>Federal Income Tax Withholding (22%)</span>
-              <span className="font-mono">-${federalTaxWithholding.toFixed(2)}</span>
+              <span>Income Tax TDS Withholding (New Regime)</span>
+              <span className="font-mono">-₹{federalTaxWithholding.toFixed(2)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#EF4444' }}>
-              <span>State / Provincial Withholding (5.5%)</span>
-              <span className="font-mono">-${stateTaxWithholding.toFixed(2)}</span>
+              <span>State Professional Tax (PT)</span>
+              <span className="font-mono">-₹{stateTaxWithholding.toFixed(2)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#EF4444' }}>
-              <span>FICA / Medicare / Social Levies (7.65%)</span>
-              <span className="font-mono">-${fdmicaTaxWithholding.toFixed(2)}</span>
+              <span>ESIC / Statutory Health Insurance (0.75%)</span>
+              <span className="font-mono">-₹{fdmicaTaxWithholding.toFixed(2)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#FFB020' }}>
-              <span>Post-Tax Deductions & Benefits</span>
-              <span className="font-mono">-${postTaxDeductions.toFixed(2)}</span>
+              <span>Post-Tax Deductions & Staff Benefits</span>
+              <span className="font-mono">-₹{postTaxDeductions.toFixed(2)}</span>
             </div>
 
             <div 
@@ -206,16 +206,16 @@ export const HRMPayrollModule: React.FC = () => {
                 alignItems: 'center'
               }}
             >
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#FFF' }}>NET DIRECT DEPOSIT PAYOUT</span>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#FFF' }}>NET BANK TRANSFER PAYOUT</span>
               <span className="font-mono" style={{ fontSize: '20px', fontWeight: 900, color: '#10B981' }}>
-                ${netTakeHome.toFixed(2)}
+                ₹{netTakeHome.toFixed(2)}
               </span>
             </div>
           </div>
 
           <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ShieldCheck size={14} color="#10B981" />
-            <span>Cryptographic NACHA / SEPA pain.001.001.03 hash validated.</span>
+            <span>Cryptographic RBI NEFT / RTGS batch hash validated.</span>
           </div>
         </div>
       </div>

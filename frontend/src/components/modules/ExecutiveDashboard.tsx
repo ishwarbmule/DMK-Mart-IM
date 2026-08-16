@@ -5,7 +5,7 @@ import {
   ArrowDownRight, 
   Zap, 
   Activity, 
-  DollarSign, 
+  IndianRupee, 
   Truck, 
   CheckCircle2,
   Sparkles,
@@ -50,7 +50,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'],
     datasets: [
       {
-        label: 'Real-Time Working Capital ($M)',
+        label: 'Real-Time Working Capital (₹ Cr)',
         data: [13.2, 13.8, 14.1, 14.4, 14.2, 14.7, 14.82],
         borderColor: '#FF6B00',
         backgroundColor: 'rgba(255, 107, 0, 0.15)',
@@ -133,10 +133,10 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button 
-            onClick={() => onSelectModule('finance')}
+            onClick={() => onSelectModule('bookkeeping')}
             className="btn-secondary"
           >
-            <DollarSign size={16} />
+            <IndianRupee size={16} />
             <span>General Ledger</span>
           </button>
           <button 
@@ -229,7 +229,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {[
-              { id: 'ev-1', type: 'finance.journal.posted', text: 'JE-2026-9012 Auto-Posted: $4,200.00 (AP Match)', time: '1m ago', color: '#10B981' },
+              { id: 'ev-1', type: 'finance.journal.posted', text: 'JE-2026-9012 Auto-Posted: ₹42,000.00 (AP Match)', time: '1m ago', color: '#10B981' },
               { id: 'ev-2', type: 'scm.po.approved', text: 'PO-2026-088 Approved: 500 units RAW-STL-404', time: '4m ago', color: '#FF6B00' },
               { id: 'ev-3', type: 'wms.stock.allocated', text: 'Picking Wave #42 allocated via TSP shortest-path', time: '12m ago', color: '#00E5FF' },
               { id: 'ev-4', type: 'mes.telemetry.oee', text: 'Robotics Line A clocked 94.2% OEE efficiency', time: '18m ago', color: '#FFB020' },

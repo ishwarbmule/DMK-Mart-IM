@@ -10,10 +10,10 @@ export const DocumentAILab: React.FC = () => {
     { key: 'vendor_name', label: 'Vendor Legal Name', value: 'Global Steel Dynamics Corp', bbox: { top: '15%', left: '8%', width: '45%', height: '6%' }, confidence: 0.998 },
     { key: 'invoice_number', label: 'Invoice Identifier', value: 'INV-2026-0091', bbox: { top: '15%', left: '60%', width: '32%', height: '6%' }, confidence: 0.999 },
     { key: 'invoice_date', label: 'Invoice Date', value: '2026-08-14', bbox: { top: '23%', left: '60%', width: '32%', height: '5%' }, confidence: 0.994 },
-    { key: 'line_item_1', label: 'Line 1 Description', value: 'Aerospace Grade 316L Stainless Bar (50 units @ $84.00)', bbox: { top: '48%', left: '8%', width: '84%', height: '8%' }, confidence: 0.989 },
-    { key: 'subtotal', label: 'Subtotal Amount', value: '$4,200.00', bbox: { top: '68%', left: '60%', width: '32%', height: '5%' }, confidence: 0.997 },
-    { key: 'tax_amount', label: 'Tax Amount (0%)', value: '$0.00', bbox: { top: '75%', left: '60%', width: '32%', height: '5%' }, confidence: 0.992 },
-    { key: 'total_amount', label: 'Total Payable Amount', value: '$4,200.00', bbox: { top: '83%', left: '60%', width: '32%', height: '7%' }, confidence: 0.999 },
+    { key: 'line_item_1', label: 'Line 1 Description', value: 'Virgin Polypropylene Polymer Pellets (50 Bags @ ₹840.00)', bbox: { top: '48%', left: '8%', width: '84%', height: '8%' }, confidence: 0.989 },
+    { key: 'subtotal', label: 'Subtotal Amount', value: '₹42,000.00', bbox: { top: '68%', left: '60%', width: '32%', height: '5%' }, confidence: 0.997 },
+    { key: 'tax_amount', label: 'Tax Amount (18% GST)', value: '₹7,560.00', bbox: { top: '75%', left: '60%', width: '32%', height: '5%' }, confidence: 0.992 },
+    { key: 'total_amount', label: 'Total Payable Amount', value: '₹49,560.00', bbox: { top: '83%', left: '60%', width: '32%', height: '7%' }, confidence: 0.999 },
   ];
 
   const activeTokenObj = tokens.find(t => t.key === selectedToken);

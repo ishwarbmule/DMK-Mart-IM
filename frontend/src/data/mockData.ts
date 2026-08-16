@@ -13,7 +13,7 @@ import {
 export const INITIAL_KPIS: KPICard[] = [
   {
     title: 'Real-Time Working Capital',
-    value: '$14,820,500',
+    value: '₹1,48,20,500',
     change: '+8.4% vs last mo',
     isPositive: true,
     subtext: 'Optimized via dynamic early-pay discounts',
@@ -179,8 +179,8 @@ export const MOCK_WORK_ORDERS: WorkOrder[] = [
 ];
 
 export const MOCK_EMPLOYEES: Employee[] = [
-  { id: 'emp-01', code: 'EMP-1001', name: 'Dr. Sarah Jenkins', title: 'Chief Financial Officer & VP Treasury', department: 'Finance & Treasury', salary: 285000, salaryCurrency: 'USD', status: 'ACTIVE', skills: ['Financial Modeling', 'GAAP/IFRS', 'M&A', 'SOX Compliance'] },
-  { id: 'emp-02', code: 'EMP-1002', name: 'Marcus Vance', title: 'VP Global Supply Chain & Logistics', department: 'Supply Chain', salary: 220000, salaryCurrency: 'USD', status: 'ACTIVE', skills: ['Strategic Sourcing', 'Dynamic ROP', 'WMS 3D Topology', 'Vendor Negotiation'] },
-  { id: 'emp-03', code: 'EMP-1003', name: 'Elena Rostova', title: 'Principal MES & Automation Architect', department: 'Manufacturing', salary: 195000, salaryCurrency: 'USD', status: 'ACTIVE', skills: ['MRP-II Scheduling', 'OPC-UA / MQTT', 'OEE Telemetry', 'BOM Engineering'] },
-  { id: 'emp-04', code: 'EMP-1004', name: 'David Chen', title: 'Lead AI & Agent Systems Engineer', department: 'R&D / Core AI', salary: 210000, salaryCurrency: 'USD', status: 'ACTIVE', skills: ['LangGraph', 'PyTorch TFT', 'RLBF Pipeline', 'LayoutLMv3 OCR'] }
+  { id: 'emp-01', code: 'EMP-1001', name: 'Dr. Sarah Jenkins', title: 'Chief Financial Officer & VP Treasury', department: 'Finance & Treasury', salary: 2850000, salaryCurrency: 'INR', status: 'ACTIVE', skills: ['Financial Modeling', 'GAAP/IFRS', 'M&A', 'SOX Compliance'] },
+  { id: 'emp-02', code: 'EMP-1002', name: 'Marcus Vance', title: 'VP Global Supply Chain & Logistics', department: 'Supply Chain', salary: 2200000, salaryCurrency: 'INR', status: 'ACTIVE', skills: ['Strategic Sourcing', 'Dynamic ROP', 'WMS 3D Topology', 'Vendor Negotiation'] },
+  { id: 'emp-03', code: 'EMP-1003', name: 'Elena Rostova', title: 'Principal MES & Automation Architect', department: 'Manufacturing', salary: 1950000, salaryCurrency: 'INR', status: 'ACTIVE', skills: ['MRP-II Scheduling', 'OPC-UA / MQTT', 'OEE Telemetry', 'BOM Engineering'] },
+  { id: 'emp-04', code: 'EMP-1004', name: 'David Chen', title: 'Lead AI & Agent Systems Engineer', department: 'R&D / Core AI', salary: 2100000, salaryCurrency: 'INR', status: 'ACTIVE', skills: ['LangGraph', 'PyTorch TFT', 'RLBF Pipeline', 'LayoutLMv3 OCR'] }
 ];

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, ShieldCheck, CheckCircle2, AlertTriangle, Sparkles, DollarSign } from 'lucide-react';
+import { TrendingUp, ShieldCheck, CheckCircle2, AlertTriangle, Sparkles, IndianRupee } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const CRMCPQModule: React.FC = () => {
@@ -25,7 +25,7 @@ export const CRMCPQModule: React.FC = () => {
     if (!isMarginApproved) return;
     confetti({ particleCount: 60, spread: 60, colors: ['#FF6B00', '#10B981', '#FFFFFF'] });
     const quoteNum = `QT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    setQuoteCreatedNotice(`Quote ${quoteNum} generated successfully for $${finalQuotePrice.toLocaleString()} with ${contributionMargin.toFixed(1)}% margin.`);
+    setQuoteCreatedNotice(`Quote ${quoteNum} generated successfully for ₹${finalQuotePrice.toLocaleString()} with ${contributionMargin.toFixed(1)}% margin.`);
     setTimeout(() => setQuoteCreatedNotice(null), 5000);
   };
 
@@ -108,8 +108,8 @@ export const CRMCPQModule: React.FC = () => {
                 onChange={e => setArmType(e.target.value)}
                 style={{ width: '100%', padding: '10px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#FFF', marginTop: '4px' }}
               >
-                <option value="6_AXIS_HEAVY">6-Axis Heavy Payload (BOM Cost: $14,500)</option>
-                <option value="4_AXIS_LIGHT">4-Axis Scara High-Speed (BOM Cost: $9,800)</option>
+                <option value="6_AXIS_HEAVY">6-Axis Heavy Payload (BOM Cost: ₹14,500)</option>
+                <option value="4_AXIS_LIGHT">4-Axis Scara High-Speed (BOM Cost: ₹9,800)</option>
               </select>
             </div>
 
@@ -120,8 +120,8 @@ export const CRMCPQModule: React.FC = () => {
                 onChange={e => setControllerGrade(e.target.value)}
                 style={{ width: '100%', padding: '10px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: '#FFF', marginTop: '4px' }}
               >
-                <option value="AI_EDGE_DUAL_GPU">Dual NVIDIA Orin AI Controller (BOM Cost: $3,800)</option>
-                <option value="STANDARD_PLC">Standard RISC-V MCU Controller (BOM Cost: $1,800)</option>
+                <option value="AI_EDGE_DUAL_GPU">Dual NVIDIA Orin AI Controller (BOM Cost: ₹3,800)</option>
+                <option value="STANDARD_PLC">Standard RISC-V MCU Controller (BOM Cost: ₹1,800)</option>
               </select>
             </div>
 
@@ -135,7 +135,7 @@ export const CRMCPQModule: React.FC = () => {
                     className={warrantyYears === yr ? 'btn-primary' : 'btn-secondary'}
                     style={{ flex: 1, padding: '8px' }}
                   >
-                    {yr} Year{yr > 1 ? 's' : ''} (${yr * 800})
+                    {yr} Year{yr > 1 ? 's' : ''} (₹{yr * 800})
                   </button>
                 ))}
               </div>
@@ -168,20 +168,20 @@ export const CRMCPQModule: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Live Manufacturing BOM Cost:</span>
-                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${totalBOMCost.toLocaleString()}</span>
+                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{totalBOMCost.toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Catalog Standard List Price:</span>
-                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${listPrice.toFixed(2)}</span>
+                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{listPrice.toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#EF4444' }}>
                 <span>Applied Customer Discount ({discountPct}%):</span>
-                <span className="font-mono">-${discountAmount.toFixed(2)}</span>
+                <span className="font-mono">-₹{discountAmount.toFixed(2)}</span>
               </div>
               <div style={{ borderTop: '2px solid var(--border-medium)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', fontWeight: 800, color: '#FFF' }}>FINAL CONTRACT QUOTE:</span>
                 <span className="font-mono" style={{ fontSize: '22px', fontWeight: 900, color: 'var(--accent-orange-bright)' }}>
-                  ${finalQuotePrice.toFixed(2)}
+                  ₹{finalQuotePrice.toFixed(2)}
                 </span>
               </div>
             </div>

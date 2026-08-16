@@ -80,7 +80,7 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 1100,
     colorOptions: ['Crystal Clear / Orange Lid'],
     stockQuantity: 200,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 310,
       tier2_wholesale: 350,
@@ -101,7 +101,7 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 2400,
     colorOptions: ['Industrial Grey', 'Navy Blue'],
     stockQuantity: 80,
-    companyId: 'comp-03',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 650,
       tier2_wholesale: 720,
@@ -143,7 +143,7 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 280,
     colorOptions: ['Pastel Pink', 'Pastel Mint', 'Sky Blue'],
     stockQuantity: 450,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 45,
       tier2_wholesale: 52,

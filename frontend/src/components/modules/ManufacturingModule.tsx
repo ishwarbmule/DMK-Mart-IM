@@ -50,7 +50,7 @@ export const ManufacturingModule: React.FC = () => {
               Scrap: <strong className="font-mono" style={{ color: '#FFB020' }}>{node.scrapFactorPct}%</strong>
             </div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981', fontFamily: 'var(--font-mono)' }}>
-              ${node.unitCost.toLocaleString()}
+              ₹{node.unitCost.toLocaleString()}
             </div>
           </div>
         </div>
@@ -98,11 +98,12 @@ export const ManufacturingModule: React.FC = () => {
               Advanced Manufacturing Execution & MRP-II (MES)
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              Recursive Multi-Level BOM Cost Rollup & Finite Capacity Shop Floor Dispatch
+              Multi-Level BOM Engineering & Shop Floor Work Order Tracking
             </div>
           </div>
         </div>
 
+        {/* Tab Switcher */}
         <div style={{ display: 'flex', gap: '6px', background: 'var(--bg-primary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
           <button 
             onClick={() => setActiveTab('bom_tree')}
@@ -135,7 +136,7 @@ export const ManufacturingModule: React.FC = () => {
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Total Rolled-Up Unit Cost</div>
               <div className="font-mono" style={{ fontSize: '20px', fontWeight: 900, color: '#10B981' }}>
-                $14,500.00
+                ₹14,500.00
               </div>
             </div>
           </div>

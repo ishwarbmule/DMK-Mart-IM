@@ -8,7 +8,7 @@ import {
   Users, 
   Package, 
   FileText, 
-  DollarSign, 
+  IndianRupee, 
   Scale, 
   Download, 
   CheckCircle2, 
@@ -20,6 +20,12 @@ import { DMK_COMPANIES, MOCK_CUSTOMERS } from '../../data/multiCompanyData';
 import { useERPData } from '../../context/ERPContext';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { ExportOptions } from '../../utils/exportUtils';
+import { 
+  getTodayFormatted, 
+  getYesterdayFormatted, 
+  getCurrentMonthFormatted, 
+  getCurrentFinancialYear 
+} from '../../utils/dateUtils';
 
 interface ReportsModuleProps {
   activeCompany?: CompanyVertical;
@@ -38,7 +44,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({
 }) => {
   const { bills, customers, products } = useERPData();
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
-  const [period, setPeriod] = useState<string>('August 2026 (Current Month)');
+  const [period, setPeriod] = useState<string>(`${getCurrentMonthFormatted()} (Current Month)`);
 
   const handlePrint = () => {
     window.print();
@@ -313,7 +319,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({
       key: 'profit_loss' as ReportType,
       title: 'Profit & Loss (P&L) Statement',
       description: 'Income statement showing manufacturing revenues, direct COGS, overheads and net profits.',
-      icon: DollarSign,
+      icon: IndianRupee,
       badge: 'FINANCIAL',
       badgeColor: 'status-pill-success'
     },
@@ -367,11 +373,11 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({
               className="form-input"
               style={{ height: '34px', width: 'auto', fontSize: '12px', fontWeight: 600 }}
             >
-              <option value="August 2026 (Current Month)">August 2026 (Current Month)</option>
-              <option value="Today (15 Aug 2026)">Today (15 Aug 2026)</option>
-              <option value="Yesterday (14 Aug 2026)">Yesterday (14 Aug 2026)</option>
-              <option value="Q2 FY 2026-27 (Jul - Sep 2026)">Q2 FY 2026-27 (Jul - Sep 2026)</option>
-              <option value="Full Year FY 2026-27 (Apr 2026 - Mar 2027)">Full Year FY 2026-27</option>
+              <option value={`${getCurrentMonthFormatted()} (Current Month)`}>{getCurrentMonthFormatted()} (Current Month)</option>
+              <option value={`Today (${getTodayFormatted()})`}>Today ({getTodayFormatted()})</option>
+              <option value={`Yesterday (${getYesterdayFormatted()})`}>Yesterday ({getYesterdayFormatted()})</option>
+              <option value={`Q2 ${getCurrentFinancialYear()} (Jul - Sep)`}>Q2 {getCurrentFinancialYear()} (Jul - Sep)</option>
+              <option value={`Full Year ${getCurrentFinancialYear()}`}>Full Year {getCurrentFinancialYear()}</option>
             </select>
           </div>
 

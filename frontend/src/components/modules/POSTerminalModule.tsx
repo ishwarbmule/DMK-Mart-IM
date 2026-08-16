@@ -14,11 +14,15 @@ import {
   Sparkles,
   Receipt,
   RotateCcw,
-  X
+  X,
+  IndianRupee
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ExportDropdown } from '../common/ExportDropdown';
 import { ExportOptions } from '../../utils/exportUtils';
+import { useERPData } from '../../context/ERPContext';
+import { DMK_COMPANIES } from '../../data/multiCompanyData';
+import { FinalInvoiceData } from '../../types/erp';
 
 interface POSItem {
   id: string;
@@ -38,6 +42,7 @@ interface CartItem extends POSItem {
 }
 
 export const POSTerminalModule: React.FC = () => {
+  const { addFastOrderBill } = useERPData();
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('+91 98765 43210');
@@ -141,8 +146,9 @@ export const POSTerminalModule: React.FC = () => {
       colors: ['#FF6B00', '#10B981', '#FFFFFF', '#00E5FF']
     });
 
+    const posInvoiceNum = `DCD/26-27/${Math.floor(1000 + Math.random() * 9000)}`;
     const orderData = {
-      invoiceNo: `DMK-POS-${Math.floor(100000 + Math.random() * 900000)}`,
+      invoiceNo: posInvoiceNum,
       date: new Date().toLocaleString(),
       customerName,
       customerPhone,
@@ -156,6 +162,70 @@ export const POSTerminalModule: React.FC = () => {
       changeDue
     };
 
+    // Auto-record into universal Tax Invoices & Ledger register
+    const universalInv: FinalInvoiceData = {
+      invoiceNumber: posInvoiceNum,
+      invoiceDate: new Date().toISOString().split('T')[0],
+      company: DMK_COMPANIES[3],
+      customer: {
+        id: `cust-pos-${Date.now()}`,
+        partyName: customerName || 'Walk-in Retail POS Customer',
+        phone: customerPhone,
+        stateCode: '27',
+        city: 'Thane',
+        partyType: 'CASH_CUSTOMER',
+        assignedTier: 'tier5_mrp',
+        outstandingBalance: 0,
+        balanceType: 'Cr',
+        creditLimit: 0
+      },
+      lineItems: cart.map((c, idx) => ({
+        id: `pos-li-${idx}`,
+        product: {
+          id: c.id,
+          sku: c.sku,
+          name: c.name,
+          category: 'Kitchen Storage & Jars',
+          material: 'Food Grade Plastic',
+          hsnCode: c.hsnCode,
+          gstRate: c.gstRate,
+          unitOfMeasure: 'Pcs',
+          weightGrams: 500,
+          colorOptions: ['Standard'],
+          stockQuantity: c.stock,
+          pricing: {
+            tier1_distributor: c.price * 0.7,
+            tier2_wholesale: c.price * 0.8,
+            tier3_semi_wholesale: c.price * 0.85,
+            tier4_retailer: c.price * 0.9,
+            tier5_mrp: c.price
+          },
+          companyId: 'comp-01'
+        },
+        selectedTier: 'tier5_mrp',
+        unitPrice: c.price * (1 - c.discountPct / 100),
+        quantity: c.quantity,
+        unitOfMeasure: 'Pcs',
+        discountPct: c.discountPct,
+        taxableAmount: c.price * c.quantity * (1 - c.discountPct / 100),
+        gstRate: c.gstRate,
+        cgstAmount: (c.price * c.quantity * (1 - c.discountPct / 100) * (c.gstRate / 100)) / 2,
+        sgstAmount: (c.price * c.quantity * (1 - c.discountPct / 100) * (c.gstRate / 100)) / 2,
+        igstAmount: 0,
+        totalAmount: (c.price * c.quantity * (1 - c.discountPct / 100)) * (1 + c.gstRate / 100)
+      })),
+      subtotalTaxable: subtotal,
+      totalCGST: cgst,
+      totalSGST: sgst,
+      totalIGST: 0,
+      roundOff: 0,
+      grandTotal: Math.round(grandTotal),
+      amountInWords: `INR ${Math.round(grandTotal).toLocaleString('en-IN')} Rupees Only`,
+      paymentMode: paymentMethod === 'UPI' ? 'UPI' : paymentMethod === 'CASH' ? 'CASH' : 'NEFT_RTGS',
+      notes: 'Express Retail POS counter sale receipt.'
+    };
+
+    addFastOrderBill(universalInv);
     setCompletedOrder(orderData);
     setShowReceiptModal(true);
     setCart([]);

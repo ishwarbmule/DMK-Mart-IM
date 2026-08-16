@@ -9,9 +9,9 @@ export const BPMNWorkflowModule: React.FC = () => {
   const workflowSteps = [
     { stepId: 1, name: 'Document Ingestion (EDI / OCR)', agent: 'Document AI', latency: '350ms', bottleneckScore: 'LOW', status: 'COMPLETED' },
     { stepId: 2, name: 'Deterministic 3-Way Reconciliation', agent: 'Finance Controller', latency: '42ms', bottleneckScore: 'OPTIMAL', status: 'COMPLETED' },
-    { stepId: 3, name: 'Policy & Guardrail Gateway ($10k Limit)', agent: 'Compliance Guardrail', latency: '12ms', bottleneckScore: 'OPTIMAL', status: 'ACTIVE' },
+    { stepId: 3, name: 'Policy & Guardrail Gateway (₹1 Lakh Limit)', agent: 'Compliance Guardrail', latency: '12ms', bottleneckScore: 'OPTIMAL', status: 'ACTIVE' },
     { stepId: 4, name: 'General Ledger ACID Double-Entry Post', agent: 'Finance Controller', latency: '18ms', bottleneckScore: 'OPTIMAL', status: 'PENDING' },
-    { stepId: 5, name: 'SEPA / NACHA Payment Queueing (2/10 Net 30)', agent: 'Treasury Agent', latency: '8ms', bottleneckScore: 'OPTIMAL', status: 'PENDING' }
+    { stepId: 5, name: 'SEPA / NACHA / NEFT Payment Queueing', agent: 'Treasury Agent', latency: '8ms', bottleneckScore: 'OPTIMAL', status: 'PENDING' }
   ];
 
   const handleSimulateExecution = () => {
@@ -163,7 +163,7 @@ export const BPMNWorkflowModule: React.FC = () => {
             Autonomous Policy Elevation Candidate
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            Tier-1 Vendor AP Invoices under $10,000 exhibit 0.00% defect rate over 180 days. System recommends increasing straight-through ceiling to $15,000.
+            Tier-1 Vendor AP Invoices under ₹1,00,000 exhibit 0.00% defect rate over 180 days. System recommends increasing straight-through ceiling to ₹1,50,000.
           </div>
           <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="status-pill status-pill-orange">RECOMMENDATION READY</span>

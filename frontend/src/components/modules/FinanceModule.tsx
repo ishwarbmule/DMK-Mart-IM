@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  DollarSign, 
+  IndianRupee, 
   Plus, 
   CheckCircle2, 
   AlertTriangle, 
@@ -58,7 +58,7 @@ export const FinanceModule: React.FC = () => {
       colors: ['#FF6B00', '#10B981', '#FFFFFF']
     });
 
-    setPostSuccessMessage(`Journal Entry ${entryNumber} successfully committed with ACID double-entry integrity ($${totalDebits.toLocaleString()}).`);
+    setPostSuccessMessage(`Journal Entry ${entryNumber} successfully committed with ACID double-entry integrity (₹${totalDebits.toLocaleString()}).`);
     setTimeout(() => setPostSuccessMessage(null), 5000);
 
     setEntryNumber(`JE-2026-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -95,7 +95,7 @@ export const FinanceModule: React.FC = () => {
               color: 'var(--accent-orange)'
             }}
           >
-            <DollarSign size={20} />
+            <IndianRupee size={20} />
           </div>
           <div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>
@@ -162,9 +162,9 @@ export const FinanceModule: React.FC = () => {
                 <th>Account Code</th>
                 <th>Account Name</th>
                 <th>Classification</th>
-                <th style={{ textAlign: 'right' }}>Total Debit ($)</th>
-                <th style={{ textAlign: 'right' }}>Total Credit ($)</th>
-                <th style={{ textAlign: 'right' }}>Net Base Balance ($)</th>
+                <th style={{ textAlign: 'right' }}>Total Debit (₹)</th>
+                <th style={{ textAlign: 'right' }}>Total Credit (₹)</th>
+                <th style={{ textAlign: 'right' }}>Net Base Balance (₹)</th>
               </tr>
             </thead>
             <tbody>
@@ -177,10 +177,10 @@ export const FinanceModule: React.FC = () => {
                       {row.accountClass}
                     </span>
                   </td>
-                  <td className="font-mono" style={{ textAlign: 'right' }}>${row.totalDebit.toLocaleString()}</td>
-                  <td className="font-mono" style={{ textAlign: 'right' }}>${row.totalCredit.toLocaleString()}</td>
+                  <td className="font-mono" style={{ textAlign: 'right' }}>₹{row.totalDebit.toLocaleString()}</td>
+                  <td className="font-mono" style={{ textAlign: 'right' }}>₹{row.totalCredit.toLocaleString()}</td>
                   <td className="font-mono" style={{ textAlign: 'right', fontWeight: 700, color: row.netBalance >= 0 ? '#10B981' : '#EF4444' }}>
-                    ${Math.abs(row.netBalance).toLocaleString()} {row.netBalance < 0 ? 'CR' : 'DR'}
+                    ₹{Math.abs(row.netBalance).toLocaleString()} {row.netBalance < 0 ? 'CR' : 'DR'}
                   </td>
                 </tr>
               ))}
@@ -188,8 +188,8 @@ export const FinanceModule: React.FC = () => {
             <tfoot>
               <tr style={{ background: 'var(--bg-tertiary)', fontWeight: 800 }}>
                 <td colSpan={3} style={{ textAlign: 'right', padding: '14px 16px', color: '#FFF' }}>GRAND TOTAL EQUILIBRIUM:</td>
-                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>$63,950,000</td>
-                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>$63,950,000</td>
+                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>₹63,950,000</td>
+                <td className="font-mono" style={{ textAlign: 'right', color: '#10B981' }}>₹63,950,000</td>
                 <td style={{ textAlign: 'right', color: '#10B981' }}>
                   <span className="status-pill status-pill-success">BALANCED (0.00 VARIANCE)</span>
                 </td>
@@ -310,16 +310,16 @@ export const FinanceModule: React.FC = () => {
             <div style={{ display: 'flex', gap: '24px' }}>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>TOTAL DEBITS: </span>
-                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${totalDebits.toLocaleString()}</span>
+                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{totalDebits.toLocaleString()}</span>
               </div>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>TOTAL CREDITS: </span>
-                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>${totalCredits.toLocaleString()}</span>
+                <span className="font-mono" style={{ fontWeight: 700, color: '#FFF' }}>₹{totalCredits.toLocaleString()}</span>
               </div>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>IMBALANCE: </span>
                 <span className="font-mono" style={{ fontWeight: 700, color: isBalanced ? '#10B981' : '#EF4444' }}>
-                  ${Math.abs(totalDebits - totalCredits).toLocaleString()}
+                  ₹{Math.abs(totalDebits - totalCredits).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -370,7 +370,7 @@ export const FinanceModule: React.FC = () => {
                     </span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                    Matched against PO <strong>{match.poNumber}</strong> ($ {match.poAmount.toLocaleString()}) and GRN <strong>{match.grnNumber}</strong>
+                    Matched against PO <strong>{match.poNumber}</strong> (₹{match.poAmount.toLocaleString()}) and GRN <strong>{match.grnNumber}</strong>
                   </div>
                 </div>
               </div>
@@ -378,10 +378,10 @@ export const FinanceModule: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div className="font-mono" style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>
-                    ${match.invoiceAmount.toLocaleString()}
+                    ₹{match.invoiceAmount.toLocaleString()}
                   </div>
                   <div style={{ fontSize: '11px', color: match.varianceAmount === 0 ? '#10B981' : '#EF4444' }}>
-                    Variance: ${match.varianceAmount.toFixed(2)}
+                    Variance: ₹{match.varianceAmount.toFixed(2)}
                   </div>
                 </div>
 

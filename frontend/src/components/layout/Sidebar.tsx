@@ -11,7 +11,7 @@ import {
   Truck, 
   Cpu, 
   Users, 
-  TrendingUp, 
+  Briefcase,
   FileSearch, 
   GitFork, 
   Bot, 
@@ -52,35 +52,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navSections: NavSection[] = [
     {
-      title: 'Sales & Finance Suite',
+      title: 'Sales & Commerce',
       items: [
-        { key: 'typeahead_billing', label: '5-Tier Typeahead Billing', icon: Receipt, badge: 'FAST', badgeColor: 'status-pill-orange' },
-        { key: 'invoice_viewer', label: 'Official A4 Tax Invoices', icon: Printer, badge: 'A4', badgeColor: 'status-pill-cyan' },
-        { key: 'plastics_catalog', label: '500+ Plastics Master', icon: Package, badge: '500+' },
-        { key: 'customers', label: 'Customer 360 & Ledgers', icon: Users, badge: '360°', badgeColor: 'status-pill-cyan' },
-        { key: 'bookkeeping', label: 'Tally Financial Ledgers', icon: BookOpen, badge: 'TALLY', badgeColor: 'status-pill-success' },
-        { key: 'reports', label: 'Financial & Audit Reports', icon: FileSpreadsheet, badge: '6 REPTS' },
-        { key: 'pos', label: 'Express Retail Counter', icon: ShoppingCart },
-        { key: 'gst_billing', label: 'GST Invoicing & E-Way', icon: FileText },
+        { key: 'dashboard', label: 'Executive Dashboard', icon: LayoutDashboard, badge: 'LIVE', badgeColor: 'status-pill-success' },
+        { key: 'typeahead_billing', label: 'Sales Billing', icon: Receipt, badge: '5-TIER', badgeColor: 'status-pill-orange' },
+        { key: 'pos', label: 'Point of Sale (POS)', icon: ShoppingCart, badge: 'EXPRESS', badgeColor: 'status-pill-cyan' },
+        { key: 'invoice_viewer', label: 'Tax Invoices', icon: Printer, badge: 'A4 PRINT', badgeColor: 'status-pill-cyan' },
+        { key: 'plastics_catalog', label: 'Products & Catalog', icon: Package, badge: '500+ SKUs', badgeColor: 'status-pill-orange' },
+        { key: 'customers', label: 'Customers & CRM', icon: Users, badge: '360°', badgeColor: 'status-pill-cyan' },
       ]
     },
     {
-      title: 'Operations & Mfgr',
+      title: 'Finance & Accounting',
       items: [
-        { key: 'dashboard', label: 'Executive Cockpit', icon: LayoutDashboard },
-        { key: 'mes', label: 'Moulding & Manufacturing', icon: Cpu, badge: 'OEE' },
-        { key: 'wms', label: 'Warehouse & Stock Bins', icon: Layers },
-        { key: 'scm', label: 'Polymer Raw Supply', icon: Truck },
-        { key: 'hcm', label: 'Workforce & Payroll', icon: Users },
+        { key: 'bookkeeping', label: 'Accounting & Ledgers', icon: BookOpen, badge: 'TALLY', badgeColor: 'status-pill-success' },
+        { key: 'reports', label: 'Reports & Analytics', icon: FileSpreadsheet, badge: 'AUDIT', badgeColor: 'status-pill-cyan' },
+        { key: 'gst_billing', label: 'GST & Compliance', icon: FileText, badge: 'E-WAY', badgeColor: 'status-pill-orange' },
       ]
     },
     {
-      title: 'Cognitive Mesh & Config',
+      title: 'Operations & Supply Chain',
       items: [
-        { key: 'swarm_visualizer', label: 'AI Multi-Agent Swarm', icon: Bot, badge: 'LIVE', badgeColor: 'status-pill-cyan' },
-        { key: 'doc_ai', label: 'Cognitive OCR Scanner', icon: FileSearch },
-        { key: 'bpmn', label: 'BPMN 2.0 Workflows', icon: GitFork },
-        { key: 'settings', label: 'Multi-Company & Settings', icon: Settings, badge: '4 CO' },
+        { key: 'mes', label: 'Manufacturing (MES)', icon: Cpu, badge: 'OEE', badgeColor: 'status-pill-orange' },
+        { key: 'wms', label: 'Warehouse (WMS)', icon: Layers, badge: 'BINS', badgeColor: 'status-pill-cyan' },
+        { key: 'scm', label: 'Procurement & SCM', icon: Truck, badge: 'ROP', badgeColor: 'status-pill-success' },
+        { key: 'hcm', label: 'HRM & Payroll', icon: Briefcase, badge: 'PAYROLL', badgeColor: 'status-pill-cyan' },
+      ]
+    },
+    {
+      title: 'AI & System Settings',
+      items: [
+        { key: 'swarm_visualizer', label: 'AI Swarm Intelligence', icon: Bot, badge: 'LIVE', badgeColor: 'status-pill-cyan' },
+        { key: 'doc_ai', label: 'Document AI & OCR', icon: FileSearch, badge: 'OCR', badgeColor: 'status-pill-orange' },
+        { key: 'bpmn', label: 'Workflows & Automation', icon: GitFork, badge: 'BPMN 2.0', badgeColor: 'status-pill-cyan' },
+        { key: 'settings', label: 'Company & System Settings', icon: Settings, badge: 'DMK MART', badgeColor: 'status-pill-success' },
       ]
     }
   ];
@@ -141,7 +146,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         ) : (
-          <div 
+          <button 
+            onClick={onToggleCollapse}
             style={{
               width: '36px',
               height: '36px',
@@ -152,31 +158,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               justifyContent: 'center',
               fontWeight: 900,
               color: '#FFF',
-              fontSize: '18px'
+              fontSize: '18px',
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 0 16px rgba(255, 107, 0, 0.45)'
             }}
+            title="Expand Sidebar"
           >
             D
-          </div>
+          </button>
         )}
 
-        <button
-          onClick={onToggleCollapse}
-          style={{
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border-subtle)',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            padding: '6px',
-            display: isCollapsed ? 'none' : 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '6px',
-            transition: 'all 0.15s ease'
-          }}
-          title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-        >
-          <ChevronLeft size={16} />
-        </button>
+        {!isCollapsed && (
+          <button
+            onClick={onToggleCollapse}
+            style={{
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              transition: 'all 0.15s ease'
+            }}
+            title="Collapse Sidebar"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
       </div>
 
       {/* Grouped Navigation Links */}
@@ -226,22 +238,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     background: isActive 
                       ? 'linear-gradient(90deg, rgba(255, 107, 0, 0.18) 0%, rgba(255, 107, 0, 0.05) 100%)' 
                       : 'transparent',
-                    color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
+                    color: isActive ? '#FFFFFF' : '#CBD5E1',
                     border: isActive ? '1px solid rgba(255, 107, 0, 0.4)' : '1px solid transparent',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     whiteSpace: 'nowrap'
                   }}
                   onMouseEnter={e => {
-                    if (!isActive) e.currentTarget.style.background = 'var(--bg-tertiary)';
+                    if (!isActive) {
+                      e.currentTarget.style.background = 'var(--bg-tertiary)';
+                      e.currentTarget.style.color = '#FFFFFF';
+                    }
                   }}
                   onMouseLeave={e => {
-                    if (!isActive) e.currentTarget.style.background = 'transparent';
+                    if (!isActive) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#CBD5E1';
+                    }
                   }}
                 >
                   <Icon 
                     size={18} 
-                    color={isActive ? 'var(--accent-orange)' : 'currentColor'} 
+                    color={isActive ? 'var(--accent-orange)' : '#E2E8F0'} 
                     style={{ flexShrink: 0 }}
                   />
                   {!isCollapsed && (

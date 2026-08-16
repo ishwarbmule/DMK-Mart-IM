@@ -56,7 +56,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 850,
     colorOptions: ['Pearl White', 'Ocean Blue', 'Ruby Red', 'Sunset Orange'],
     stockQuantity: 1200,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 85.00,
       tier2_wholesale: 95.00,
@@ -79,7 +79,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 920,
     colorOptions: ['Translucent Blue', 'Opaque Red', 'Emerald Green', 'Silver Grey'],
     stockQuantity: 840,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 110.00,
       tier2_wholesale: 125.00,
@@ -100,7 +100,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 1150,
     colorOptions: ['Transparent Pink', 'Transparent Blue', 'Transparent Purple'],
     stockQuantity: 530,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 145.00,
       tier2_wholesale: 165.00,
@@ -121,7 +121,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 750,
     colorOptions: ['Sky Blue', 'Crimson Red', 'Bright Yellow'],
     stockQuantity: 920,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 78.00,
       tier2_wholesale: 88.00,
@@ -144,7 +144,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 680,
     colorOptions: ['Clear Body / Black Lid', 'Clear Body / Orange Lid', 'Clear Body / Blue Lid'],
     stockQuantity: 340,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 190.00,
       tier2_wholesale: 220.00,
@@ -165,7 +165,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 1400,
     colorOptions: ['Nordic Grey', 'Mint Green', 'Ivory White'],
     stockQuantity: 180,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 390.00,
       tier2_wholesale: 440.00,
@@ -188,7 +188,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 2100,
     colorOptions: ['Signal Red', 'Bright Blue', 'Industrial Green'],
     stockQuantity: 1500,
-    companyId: 'comp-03',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 260.00,
       tier2_wholesale: 290.00,
@@ -209,7 +209,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 1850,
     colorOptions: ['Dairy Blue', 'Golden Yellow'],
     stockQuantity: 950,
-    companyId: 'comp-03',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 210.00,
       tier2_wholesale: 235.00,
@@ -232,7 +232,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 1600,
     colorOptions: ['Hospital Blue', 'Biohazard Yellow', 'Dark Grey'],
     stockQuantity: 280,
-    companyId: 'comp-03',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 310.00,
       tier2_wholesale: 350.00,
@@ -255,7 +255,7 @@ export const INITIAL_PLASTICS_CATALOG: PlasticProductItem[] = [
     weightGrams: 1200,
     colorOptions: ['Assorted Colours'],
     stockQuantity: 600,
-    companyId: 'comp-02',
+    companyId: 'comp-01',
     pricing: {
       tier1_distributor: 180.00, // For 12 pcs box
       tier2_wholesale: 204.00,

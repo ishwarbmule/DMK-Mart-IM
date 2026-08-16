@@ -1,5 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Command, ArrowRight, DollarSign, Truck, Package, Cpu, Users, FileSearch, Sparkles, X } from 'lucide-react';
+import { 
+  Search, 
+  ArrowRight, 
+  Receipt, 
+  ShoppingCart, 
+  Package, 
+  Users, 
+  BookOpen, 
+  FileSpreadsheet, 
+  FileText, 
+  LayoutDashboard, 
+  Printer, 
+  Cpu, 
+  Layers, 
+  Truck, 
+  Briefcase, 
+  Bot, 
+  FileSearch, 
+  GitFork, 
+  Settings, 
+  Sparkles, 
+  X 
+} from 'lucide-react';
 import { ModuleKey } from '../../types/erp';
 
 interface CommandPaletteProps {
@@ -34,12 +56,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   if (!isOpen) return null;
 
   const quickActions = [
-    { label: 'Post General Ledger Entry', icon: DollarSign, module: 'finance' as ModuleKey, desc: 'ACID double-entry balance posting' },
-    { label: 'Calculate Dynamic ROP & Safety Stock', icon: Truck, module: 'scm' as ModuleKey, desc: 'Statistical supply chain optimization' },
-    { label: 'Inspect 3D Warehouse Stock Quant', icon: Package, module: 'wms' as ModuleKey, desc: 'Spatial bin locator & wave picking' },
-    { label: 'Explode Robotic Arm BOM Tree', icon: Cpu, module: 'mes' as ModuleKey, desc: 'Multi-level recursive manufacturing' },
-    { label: 'Calculate Gross-to-Net Payroll', icon: Users, module: 'hcm' as ModuleKey, desc: 'Statutory multi-country tax engine' },
-    { label: 'OCR Cognitive Invoice Extraction', icon: FileSearch, module: 'doc_ai' as ModuleKey, desc: 'LayoutLMv3 table & token parsing' },
+    { label: 'Executive Dashboard', icon: LayoutDashboard, module: 'dashboard' as ModuleKey, desc: 'Real-time telemetry, operational KPIs & business health' },
+    { label: 'Billing & Invoicing', icon: Receipt, module: 'typeahead_billing' as ModuleKey, desc: '5-Tier typeahead pricing & instant invoice generation' },
+    { label: 'Point of Sale (POS)', icon: ShoppingCart, module: 'pos' as ModuleKey, desc: 'Express retail counter & barcode billing' },
+    { label: 'Tax Invoices', icon: Printer, module: 'invoice_viewer' as ModuleKey, desc: 'Print & download official A4 GST tax invoices' },
+    { label: 'Products & Catalog', icon: Package, module: 'plastics_catalog' as ModuleKey, desc: '500+ plastics catalog & multi-tier pricing master' },
+    { label: 'Customers & CRM', icon: Users, module: 'customers' as ModuleKey, desc: 'Customer 360°, ledger balance & credit limits' },
+    { label: 'Accounting & Ledgers', icon: BookOpen, module: 'bookkeeping' as ModuleKey, desc: 'Tally-compatible double-entry financial ledgers' },
+    { label: 'Reports & Analytics', icon: FileSpreadsheet, module: 'reports' as ModuleKey, desc: 'P&L, Balance Sheet, GST & Trial Balance audit reports' },
+    { label: 'GST & Compliance', icon: FileText, module: 'gst_billing' as ModuleKey, desc: 'GSTR-1, GSTR-3B & E-Way Bill generation' },
+    { label: 'Manufacturing (MES)', icon: Cpu, module: 'mes' as ModuleKey, desc: 'Moulding cycles, production orders & OEE telemetry' },
+    { label: 'Warehouse (WMS)', icon: Layers, module: 'wms' as ModuleKey, desc: 'Spatial bin locator, quants & stock picking' },
+    { label: 'Procurement & SCM', icon: Truck, module: 'scm' as ModuleKey, desc: 'Polymer procurement, dynamic ROP & safety stock' },
+    { label: 'HRM & Payroll', icon: Briefcase, module: 'hcm' as ModuleKey, desc: 'Workforce management, attendance & salary slips' },
+    { label: 'AI Swarm Intelligence', icon: Bot, module: 'swarm_visualizer' as ModuleKey, desc: 'Multi-agent orchestration & autonomous reasoning' },
+    { label: 'Document AI & OCR', icon: FileSearch, module: 'doc_ai' as ModuleKey, desc: 'Smart document scanner & invoice token extraction' },
+    { label: 'Workflows & Automation', icon: GitFork, module: 'bpmn' as ModuleKey, desc: 'BPMN 2.0 visual workflow designer & approvals' },
+    { label: 'Settings & Multi-Company', icon: Settings, module: 'settings' as ModuleKey, desc: 'Configure 4 company verticals, GSTIN & defaults' },
   ];
 
   const filtered = quickActions.filter(a => a.label.toLowerCase().includes(query.toLowerCase()) || a.desc.toLowerCase().includes(query.toLowerCase()));
@@ -173,7 +206,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{action.desc}</div>
                   </div>
                 </div>
-                <ArrowRight size={14} color="var(--text-tertiary)" />
+                <ArrowRight size={14} color="var(--accent-orange-bright)" />
               </button>
             );
           })}

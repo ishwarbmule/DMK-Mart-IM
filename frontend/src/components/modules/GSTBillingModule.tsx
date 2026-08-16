@@ -13,6 +13,7 @@ import {
   Printer
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getTodayISODate } from '../../utils/dateUtils';
 
 interface GSTInvoiceLine {
   id: string;
@@ -32,7 +33,7 @@ export const GSTBillingModule: React.FC = () => {
   const [buyerGSTIN, setBuyerGSTIN] = useState<string>('29AAACB1234F1Z0');
   const [buyerLegalName, setBuyerLegalName] = useState<string>('Apex Retail Supermarkets Private Limited');
   const [invoiceNumber, setInvoiceNumber] = useState<string>(`DMK-INV-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-  const [invoiceDate, setInvoiceDate] = useState<string>('2026-08-15');
+  const [invoiceDate, setInvoiceDate] = useState<string>(getTodayISODate());
 
   const [lines, setLines] = useState<GSTInvoiceLine[]>([
     { id: '1', itemDescription: 'DMK Basmati Rice 5kg Commercial Packs', hsnSacCode: '10063010', qty: 100, unitRate: 450.00, gstRate: 5 },

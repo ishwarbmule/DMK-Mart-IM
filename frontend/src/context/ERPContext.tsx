@@ -8,6 +8,8 @@ import {
 } from '../types/erp';
 import { INITIAL_PLASTICS_CATALOG } from '../data/plasticsCatalog';
 import { MOCK_CUSTOMERS, DMK_COMPANIES } from '../data/multiCompanyData';
+import { INITIAL_ALL_INVOICES } from '../data/mockInvoices';
+import { getTodayISODate, getOffsetISODate } from '../utils/dateUtils';
 
 // Journal Entry & Ledger Types
 export interface JournalLineItem {
@@ -35,26 +37,26 @@ export interface PartyLedgerRow {
   id: string;
   date: string;
   voucherNumber: string;
-  voucherType: 'SALES' | 'RECEIPT' | 'CREDIT_NOTE' | 'JOURNAL';
+  voucherType: string;
   particulars: string;
   debitAmount: number;
   creditAmount: number;
   runningBalance: number;
   balanceType: 'Dr' | 'Cr';
-  narration: string;
+  narration?: string;
 }
 
 export interface BillRecord {
   billNumber: string;
   date: string;
   customer: CustomerParty;
-  type: 'Sales' | 'Purchase';
+  type: string;
   itemCount: number;
   taxableAmount: number;
   totalGst: number;
   grandTotal: number;
   balanceDue: number;
-  status: 'Invoiced' | 'Paid' | 'Partially Paid' | 'Confirmed' | 'Draft';
+  status: string;
   paymentMode: string;
   companyCode: string;
 }
@@ -64,6 +66,7 @@ interface ERPContextType {
   products: PlasticProductItem[];
   customers: CustomerParty[];
   bills: BillRecord[];
+  allInvoices: FinalInvoiceData[];
   journalEntries: FullJournalEntry[];
   partyLedgers: Record<string, PartyLedgerRow[]>;
   currentInvoice: FinalInvoiceData | null;
@@ -79,6 +82,14 @@ interface ERPContextType {
   bulkAddProducts: (newProducts: PlasticProductItem[]) => void;
   addCustomer: (customer: CustomerParty) => void;
   addJournalEntry: (entry: FullJournalEntry) => void;
+  recordCustomerPayment: (
+    customerId: string,
+    amount: number,
+    paymentMode: 'NEFT_RTGS' | 'UPI' | 'CASH' | 'CHEQUE',
+    referenceNo: string,
+    paymentDate: string,
+    narration?: string
+  ) => void;
 }
 
 const ERPContext = createContext<ERPContextType | undefined>(undefined);
@@ -86,10 +97,30 @@ const ERPContext = createContext<ERPContextType | undefined>(undefined);
 // Initial Party Ledgers
 const INITIAL_PARTY_LEDGERS: Record<string, PartyLedgerRow[]> = {
   'cust-01': [
-    { id: '1', date: '2026-08-01', voucherNumber: 'OB-2026-001', voucherType: 'JOURNAL', particulars: 'Opening Balance (Brought Forward)', debitAmount: 145000, creditAmount: 0, runningBalance: 145000, balanceType: 'Dr', narration: 'FY 2026-27 Opening Balance' }
-  ],
-  'cust-02': [
-    { id: '1', date: '2026-08-01', voucherNumber: 'OB-2026-002', voucherType: 'JOURNAL', particulars: 'Opening Balance (Brought Forward)', debitAmount: 85000, creditAmount: 0, runningBalance: 85000, balanceType: 'Dr', narration: 'Opening Dr' }
+    {
+      id: 'pl-01',
+      date: getOffsetISODate(-15),
+      voucherNumber: 'OB-2026-001',
+      voucherType: 'JOURNAL',
+      particulars: 'Opening Balance (Brought Forward)',
+      debitAmount: 145000,
+      creditAmount: 0,
+      runningBalance: 145000,
+      balanceType: 'Dr',
+      narration: 'Opening Ledger Debit'
+    },
+    {
+      id: 'pl-02',
+      date: getTodayISODate(),
+      voucherNumber: 'DMK/26-27/4019',
+      voucherType: 'SALES',
+      particulars: 'Tax Invoice — Commercial Plastic Consignment',
+      debitAmount: 171100,
+      creditAmount: 0,
+      runningBalance: 316100,
+      balanceType: 'Dr',
+      narration: 'Sales Bill Post'
+    }
   ]
 };
 
@@ -98,7 +129,7 @@ const INITIAL_JOURNAL_ENTRIES: FullJournalEntry[] = [
   {
     id: 'JE-2026-0001',
     entryNumber: 'JE-2026-0001',
-    date: '2026-08-15',
+    date: getTodayISODate(),
     description: 'Sales - BILL-2026-4010 to Sri Venkateswara Plastic Agencies',
     voucherType: 'Sales',
     totalDebit: 171100,
@@ -112,7 +143,7 @@ const INITIAL_JOURNAL_ENTRIES: FullJournalEntry[] = [
   {
     id: 'JE-2026-0002',
     entryNumber: 'JE-2026-0002',
-    date: '2026-08-14',
+    date: getOffsetISODate(-1),
     description: 'Bank Receipt - NEFT against Invoice DPM/26-27/4010',
     voucherType: 'Receipt',
     totalDebit: 75000,
@@ -128,7 +159,7 @@ const INITIAL_JOURNAL_ENTRIES: FullJournalEntry[] = [
 const INITIAL_BILLS: BillRecord[] = [
   {
     billNumber: 'DPM/26-27/4012',
-    date: '2026-08-15',
+    date: getTodayISODate(),
     customer: MOCK_CUSTOMERS[0],
     type: 'Sales',
     itemCount: 4,
@@ -142,7 +173,7 @@ const INITIAL_BILLS: BillRecord[] = [
   },
   {
     billNumber: 'DPM/26-27/4011',
-    date: '2026-08-14',
+    date: getOffsetISODate(-1),
     customer: MOCK_CUSTOMERS[1],
     type: 'Sales',
     itemCount: 2,
@@ -156,7 +187,7 @@ const INITIAL_BILLS: BillRecord[] = [
   },
   {
     billNumber: 'DPM/26-27/4010',
-    date: '2026-08-12',
+    date: getOffsetISODate(-3),
     customer: MOCK_CUSTOMERS[2],
     type: 'Sales',
     itemCount: 6,
@@ -174,6 +205,7 @@ export const ERPDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [products, setProducts] = useState<PlasticProductItem[]>(INITIAL_PLASTICS_CATALOG);
   const [customers, setCustomers] = useState<CustomerParty[]>(MOCK_CUSTOMERS);
   const [bills, setBills] = useState<BillRecord[]>(INITIAL_BILLS);
+  const [allInvoices, setAllInvoices] = useState<FinalInvoiceData[]>(INITIAL_ALL_INVOICES);
   const [journalEntries, setJournalEntries] = useState<FullJournalEntry[]>(INITIAL_JOURNAL_ENTRIES);
   const [partyLedgers, setPartyLedgers] = useState<Record<string, PartyLedgerRow[]>>(INITIAL_PARTY_LEDGERS);
   const [currentInvoice, setCurrentInvoice] = useState<FinalInvoiceData | null>(null);
@@ -291,10 +323,13 @@ export const ERPDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setBills(prev => [newBill, ...prev]);
 
-    // 6. Set Active Invoice
+    // 6. Prepend to All Invoices Master Register
+    setAllInvoices(prev => [invoice, ...prev]);
+
+    // 7. Set Active Invoice
     setCurrentInvoice(invoice);
 
-    // 7. Global Notification Banner
+    // 8. Global Notification Banner
     setFeedbackBanner(`✅ Fast Order #${invoice.invoiceNumber} (₹${invoice.grandTotal.toLocaleString('en-IN')}) successfully posted to Customer Ledger, Inventory Stock, and Tally Financials.`);
     setTimeout(() => setFeedbackBanner(null), 6000);
   };
@@ -315,12 +350,97 @@ export const ERPDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setJournalEntries(prev => [entry, ...prev]);
   };
 
+  const recordCustomerPayment = (
+    customerId: string,
+    amount: number,
+    paymentMode: 'NEFT_RTGS' | 'UPI' | 'CASH' | 'CHEQUE',
+    referenceNo: string,
+    paymentDate: string,
+    narration?: string
+  ) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    // 1. Update Customer outstanding balance
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        const newBal = Math.max(0, c.outstandingBalance - amount);
+        return {
+          ...c,
+          outstandingBalance: newBal
+        };
+      }
+      return c;
+    }));
+
+    // 2. Append to Party Ledger (Credit)
+    const existingLedger = partyLedgers[customerId] || [];
+    const prevBal = existingLedger.length > 0 ? existingLedger[existingLedger.length - 1].runningBalance : customer.outstandingBalance;
+    const newBal = prevBal - amount;
+
+    const newLedgerRow: PartyLedgerRow = {
+      id: `pl-rec-${Date.now()}`,
+      date: paymentDate,
+      voucherNumber: referenceNo || `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      voucherType: 'RECEIPT',
+      particulars: `Payment Received via ${paymentMode.replace('_', ' ')} (${referenceNo || 'Direct Settlement'})`,
+      debitAmount: 0,
+      creditAmount: amount,
+      runningBalance: Math.abs(newBal),
+      balanceType: newBal >= 0 ? 'Dr' : 'Cr',
+      narration: narration || `Settlement received against open invoices via ${paymentMode}`
+    };
+
+    setPartyLedgers(prev => ({
+      ...prev,
+      [customerId]: [...(prev[customerId] || []), newLedgerRow]
+    }));
+
+    // 3. Post Double-Entry Journal (Debit Cash/Bank, Credit Sundry Debtors)
+    const isCash = paymentMode === 'CASH';
+    const newJournal: FullJournalEntry = {
+      id: `JE-REC-${Date.now()}`,
+      entryNumber: `JE-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: paymentDate,
+      description: `Receipt - ${paymentMode} from ${customer.partyName} (Ref: ${referenceNo || 'Direct Pay'})`,
+      voucherType: 'Receipt',
+      totalDebit: amount,
+      totalCredit: amount,
+      lines: [
+        {
+          id: '1',
+          accountId: isCash ? '10000' : '10001',
+          accountName: isCash ? 'Cash in Hand (Factory Counter)' : 'HDFC Operating Bank Account',
+          accountGroup: 'Asset',
+          debit: amount,
+          credit: 0,
+          memo: `Receipt via ${paymentMode} Ref: ${referenceNo}`
+        },
+        {
+          id: '2',
+          accountId: '12000',
+          accountName: 'Accounts Receivable (Sundry Debtors)',
+          accountGroup: 'Asset',
+          debit: 0,
+          credit: amount,
+          memo: `Settlement for ${customer.partyName}`
+        }
+      ]
+    };
+
+    setJournalEntries(prev => [newJournal, ...prev]);
+
+    setFeedbackBanner(`✅ Payment Receipt of ₹${amount.toLocaleString('en-IN')} (${paymentMode}) recorded successfully for ${customer.partyName}.`);
+    setTimeout(() => setFeedbackBanner(null), 6000);
+  };
+
   return (
     <ERPContext.Provider
       value={{
         products,
         customers,
         bills,
+        allInvoices,
         journalEntries,
         partyLedgers,
         currentInvoice,
@@ -333,7 +453,8 @@ export const ERPDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addProduct,
         bulkAddProducts,
         addCustomer,
-        addJournalEntry
+        addJournalEntry,
+        recordCustomerPayment
       }}
     >
       {children}

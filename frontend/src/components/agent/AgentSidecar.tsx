@@ -248,7 +248,7 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'var(--text-secondary)',
+            color: '#FFFFFF',
             cursor: 'pointer',
             padding: '4px'
           }}

@@ -28,7 +28,8 @@ import {
   FileCheck,
   ShieldCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  UserPlus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CustomerParty, PricingTierKey, FinalInvoiceData, BilledLineItem } from '../../types/erp';

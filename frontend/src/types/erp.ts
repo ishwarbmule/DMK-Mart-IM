@@ -50,6 +50,7 @@ export interface PlasticProductItem {
   stockQuantity: number;
   pricing: PricingTiers;
   companyId: string; // Belongs to specific vertical
+  barcode?: string;
 }
 
 export interface CompanyVertical {

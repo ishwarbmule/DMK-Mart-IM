@@ -38,6 +38,9 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 2850,
     colorOptions: ['Marble Granite White', 'Royal Blue', 'Terracotta Red'],
     stockQuantity: 150,
+    damagedStock: 0,
+    lowStockThreshold: 30,
+    purchaseBaseCost: 350,
     companyId: 'comp-01',
     pricing: {
       tier1_distributor: 420,
@@ -59,6 +62,9 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 920,
     colorOptions: ['Opaque Blue', 'Opaque Red', 'Emerald Green'],
     stockQuantity: 300,
+    damagedStock: 0,
+    lowStockThreshold: 50,
+    purchaseBaseCost: 160,
     companyId: 'comp-01',
     pricing: {
       tier1_distributor: 195,
@@ -80,6 +86,9 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 1100,
     colorOptions: ['Crystal Clear / Orange Lid'],
     stockQuantity: 200,
+    damagedStock: 0,
+    lowStockThreshold: 40,
+    purchaseBaseCost: 250,
     companyId: 'comp-01',
     pricing: {
       tier1_distributor: 310,
@@ -101,6 +110,9 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 2400,
     colorOptions: ['Industrial Grey', 'Navy Blue'],
     stockQuantity: 80,
+    damagedStock: 0,
+    lowStockThreshold: 20,
+    purchaseBaseCost: 520,
     companyId: 'comp-01',
     pricing: {
       tier1_distributor: 650,
@@ -122,6 +134,9 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 3100,
     colorOptions: ['Green (Biodegradable)', 'Blue (Recyclable)', 'Yellow (Clinical)'],
     stockQuantity: 120,
+    damagedStock: 0,
+    lowStockThreshold: 25,
+    purchaseBaseCost: 460,
     companyId: 'comp-01',
     pricing: {
       tier1_distributor: 580,
@@ -143,13 +158,16 @@ const SAMPLE_DEMO_PRODUCTS: PlasticProductItem[] = [
     weightGrams: 280,
     colorOptions: ['Pastel Pink', 'Pastel Mint', 'Sky Blue'],
     stockQuantity: 450,
+    damagedStock: 0,
+    lowStockThreshold: 50,
+    purchaseBaseCost: 55,
     companyId: 'comp-01',
     pricing: {
-      tier1_distributor: 45,
-      tier2_wholesale: 52,
-      tier3_semi_wholesale: 60,
-      tier4_retailer: 75,
-      tier5_mrp: 99
+      tier1_distributor: 70,
+      tier2_wholesale: 80,
+      tier3_semi_wholesale: 95,
+      tier4_retailer: 115,
+      tier5_mrp: 150
     }
   }
 ];
@@ -382,6 +400,9 @@ export const BulkProductUploadModal: React.FC<BulkProductUploadModalProps> = ({
           weightGrams: weightVal,
           colorOptions: ['Assorted Colours'],
           stockQuantity: stockVal,
+          damagedStock: 0,
+          lowStockThreshold: 20,
+          purchaseBaseCost: Math.round(baseT2 * 0.75),
           companyId: 'comp-01',
           pricing
         });

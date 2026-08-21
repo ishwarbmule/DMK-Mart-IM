@@ -95,6 +95,9 @@ export const PlasticsProductMaster: React.FC = () => {
       weightGrams: newWeight,
       colorOptions: ['Standard Assorted'],
       stockQuantity: newStock,
+      damagedStock: 0,
+      lowStockThreshold: 25,
+      purchaseBaseCost: Math.round(t2 * 0.75),
       companyId: 'comp-01',
       pricing: {
         tier1_distributor: t1,

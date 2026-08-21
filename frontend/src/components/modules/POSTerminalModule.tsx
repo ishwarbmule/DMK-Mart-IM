@@ -168,16 +168,24 @@ export const POSTerminalModule: React.FC = () => {
       invoiceDate: new Date().toISOString().split('T')[0],
       company: DMK_COMPANIES[3],
       customer: {
-        id: `cust-pos-${Date.now()}`,
-        partyName: customerName || 'Walk-in Retail POS Customer',
-        phone: customerPhone,
+        id: 'cust-08',
+        partyName: customerName ? `Counter - ${customerName}` : 'B2C Walk-In Counter Sales',
+        phone: customerPhone || '9999900000',
         stateCode: '27',
-        city: 'Thane',
-        partyType: 'CASH_CUSTOMER',
+        city: 'Local Counter',
+        partyType: 'B2C_COUNTER_WALKIN',
         assignedTier: 'tier5_mrp',
-        outstandingBalance: 0,
+        openingBalance: 0,
+        closingBalance: 0,
         balanceType: 'Cr',
-        creditLimit: 0
+        creditLimit: 0,
+        creditDays: 0
+      },
+      isCounterSale: true,
+      walkInCustomerDetails: {
+        name: customerName || 'Walk-in Retail POS Buyer',
+        phone: customerPhone || '9999900000',
+        city: 'Local Counter'
       },
       lineItems: cart.map((c, idx) => ({
         id: `pos-li-${idx}`,
@@ -193,6 +201,9 @@ export const POSTerminalModule: React.FC = () => {
           weightGrams: 500,
           colorOptions: ['Standard'],
           stockQuantity: c.stock,
+          damagedStock: 0,
+          lowStockThreshold: 10,
+          purchaseBaseCost: c.price * 0.7,
           pricing: {
             tier1_distributor: c.price * 0.7,
             tier2_wholesale: c.price * 0.8,
@@ -203,7 +214,11 @@ export const POSTerminalModule: React.FC = () => {
           companyId: 'comp-01'
         },
         selectedTier: 'tier5_mrp',
+        packagingFormat: 'PIECE',
         unitPrice: c.price * (1 - c.discountPct / 100),
+        baseTierPrice: c.price,
+        bulkDiscountPct: 0,
+        bulkSavingsRupees: 0,
         quantity: c.quantity,
         unitOfMeasure: 'Pcs',
         discountPct: c.discountPct,

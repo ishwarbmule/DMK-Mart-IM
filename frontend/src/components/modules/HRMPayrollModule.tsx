@@ -132,7 +132,7 @@ export const HRMPayrollModule: React.FC = () => {
                     {emp.title} • {emp.department}
                   </div>
                   <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                    {emp.skills.map((sk, i) => (
+                    {emp.skills.map((sk: string, i: number) => (
                       <span key={i} style={{ fontSize: '9px', background: 'rgba(255, 255, 255, 0.05)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-tertiary)' }}>
                         {sk}
                       </span>

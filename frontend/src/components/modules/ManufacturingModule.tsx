@@ -55,7 +55,7 @@ export const ManufacturingModule: React.FC = () => {
           </div>
         </div>
 
-        {node.subComponents && node.subComponents.map(sub => renderBOMNode(sub, depth + 1))}
+        {node.subComponents && node.subComponents.map((sub: any) => renderBOMNode(sub, depth + 1))}
       </div>
     );
   };

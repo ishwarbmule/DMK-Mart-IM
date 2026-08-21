@@ -23,7 +23,11 @@ const buildLineItems = (
       id: `dmk-li-${i + 1}-${prod.id}`,
       product: prod,
       selectedTier: item.tierKey,
+      packagingFormat: 'PIECE',
       unitPrice: price,
+      baseTierPrice: price,
+      bulkDiscountPct: 0,
+      bulkSavingsRupees: 0,
       quantity: item.qty,
       unitOfMeasure: prod.unitOfMeasure,
       discountPct: 0,
@@ -96,7 +100,116 @@ const inv8 = buildLineItems(5, [
   { idx: 5, qty: 20, tierKey: 'tier5_mrp' }
 ]);
 
+const inv9 = buildLineItems(7, [
+  { idx: 0, qty: 12, tierKey: 'tier5_mrp' },
+  { idx: 2, qty: 20, tierKey: 'tier5_mrp' },
+  { idx: 4, qty: 15, tierKey: 'tier5_mrp' }
+]);
+
+const inv10 = buildLineItems(7, [
+  { idx: 1, qty: 8, tierKey: 'tier5_mrp' },
+  { idx: 5, qty: 10, tierKey: 'tier5_mrp' }
+]);
+
+const inv11 = buildLineItems(7, [
+  { idx: 6, qty: 30, tierKey: 'tier5_mrp' },
+  { idx: 8, qty: 25, tierKey: 'tier5_mrp' }
+]);
+
+const inv12 = buildLineItems(7, [
+  { idx: 3, qty: 6, tierKey: 'tier5_mrp' },
+  { idx: 7, qty: 10, tierKey: 'tier5_mrp' }
+]);
+
 export const INITIAL_ALL_INVOICES: FinalInvoiceData[] = [
+  {
+    invoiceNumber: 'DMK/26-27/4024',
+    invoiceDate: getTodayISODate(),
+    company: DMK_MART_COMPANY,
+    customer: MOCK_CUSTOMERS[7],
+    lineItems: inv9.lineItems,
+    subtotalTaxable: inv9.subtotalTaxable,
+    totalCGST: inv9.totalCGST,
+    totalSGST: inv9.totalSGST,
+    totalIGST: inv9.totalIGST,
+    roundOff: inv9.roundOff,
+    grandTotal: inv9.grandTotal,
+    amountInWords: `INR ${inv9.grandTotal.toLocaleString('en-IN')} Rupees Only`,
+    paymentMode: 'UPI',
+    notes: 'Express B2C Walk-in Retail Counter Invoice. QR verified instant payment.',
+    isCounterSale: true,
+    walkInCustomerDetails: {
+      name: 'Ramesh Pawar',
+      phone: '9823411223',
+      city: 'Latur'
+    }
+  },
+  {
+    invoiceNumber: 'DMK/26-27/4023',
+    invoiceDate: getOffsetISODate(-1),
+    company: DMK_MART_COMPANY,
+    customer: MOCK_CUSTOMERS[7],
+    lineItems: inv10.lineItems,
+    subtotalTaxable: inv10.subtotalTaxable,
+    totalCGST: inv10.totalCGST,
+    totalSGST: inv10.totalSGST,
+    totalIGST: inv10.totalIGST,
+    roundOff: inv10.roundOff,
+    grandTotal: inv10.grandTotal,
+    amountInWords: `INR ${inv10.grandTotal.toLocaleString('en-IN')} Rupees Only`,
+    paymentMode: 'CASH',
+    notes: 'Walk-in Counter Retail Sale. Spot cash payment receipt.',
+    isCounterSale: true,
+    walkInCustomerDetails: {
+      name: 'Sunita Patil',
+      phone: '9765444556',
+      city: 'Pune'
+    }
+  },
+  {
+    invoiceNumber: 'DMK/26-27/4022',
+    invoiceDate: getOffsetISODate(-2),
+    company: DMK_MART_COMPANY,
+    customer: MOCK_CUSTOMERS[7],
+    lineItems: inv11.lineItems,
+    subtotalTaxable: inv11.subtotalTaxable,
+    totalCGST: inv11.totalCGST,
+    totalSGST: inv11.totalSGST,
+    totalIGST: inv11.totalIGST,
+    roundOff: inv11.roundOff,
+    grandTotal: inv11.grandTotal,
+    amountInWords: `INR ${inv11.grandTotal.toLocaleString('en-IN')} Rupees Only`,
+    paymentMode: 'UPI',
+    notes: 'Bulk retail crate procurement for agricultural storage.',
+    isCounterSale: true,
+    walkInCustomerDetails: {
+      name: 'Rajesh Deshmukh',
+      phone: '9422088990',
+      city: 'Solapur'
+    }
+  },
+  {
+    invoiceNumber: 'DMK/26-27/4021',
+    invoiceDate: getOffsetISODate(-4),
+    company: DMK_MART_COMPANY,
+    customer: MOCK_CUSTOMERS[7],
+    lineItems: inv12.lineItems,
+    subtotalTaxable: inv12.subtotalTaxable,
+    totalCGST: inv12.totalCGST,
+    totalSGST: inv12.totalSGST,
+    totalIGST: inv12.totalIGST,
+    roundOff: inv12.roundOff,
+    grandTotal: inv12.grandTotal,
+    amountInWords: `INR ${inv12.grandTotal.toLocaleString('en-IN')} Rupees Only`,
+    paymentMode: 'CASH',
+    notes: 'Household plastic wares counter purchase.',
+    isCounterSale: true,
+    walkInCustomerDetails: {
+      name: 'Amit Shinde',
+      phone: '9890123456',
+      city: 'Latur'
+    }
+  },
   {
     invoiceNumber: 'DMK/26-27/4019',
     invoiceDate: getTodayISODate(),

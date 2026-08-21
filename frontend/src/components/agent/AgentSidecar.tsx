@@ -11,10 +11,15 @@ import {
   ChevronRight, 
   ShieldCheck,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Truck,
+  Package,
+  RotateCcw,
+  IndianRupee
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AgentExecutionMessage, AgentTaskStep } from '../../types/erp';
+import { AgentExecutionMessage } from '../../types/erp';
+import { useERPData } from '../../context/ERPContext';
 
 interface AgentSidecarProps {
   isOpen: boolean;
@@ -22,6 +27,18 @@ interface AgentSidecarProps {
 }
 
 export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) => {
+  const { 
+    products, 
+    lowStockAlerts, 
+    vendors, 
+    customers, 
+    counterCustomers,
+    purchaseOrders, 
+    purchaseReturns, 
+    salesReturns, 
+    allInvoices 
+  } = useERPData();
+
   const [inputPrompt, setInputPrompt] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -29,19 +46,19 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
     {
       id: 'msg-1',
       sender: 'orchestrator',
-      agentName: 'Master Orchestrator Agent',
-      content: 'Welcome, Dr. Sarah. The cognitive agent swarm is actively monitoring enterprise streams across all 12 modules. How can I assist your operations today?',
+      agentName: 'DMK Autonomous Agent Swarm',
+      content: 'Welcome! The DMK Mart AI Cognitive Mesh is actively monitoring inventory, dual stock, supplier POs, customer ledgers, and live daybook transactions. Ask me anything about your business!',
       timestamp: 'Just now',
       confidenceScore: 0.99
     }
   ]);
 
   const quickPrompts = [
-    'Show sales summary',
-    'List low stock products',
-    'What\'s our cash position?',
-    'Top selling products',
-    'Audit Trial Balance'
+    'Check low stock & reorders',
+    'What is Latur Ishwar Mule\'s balance?',
+    'Damaged stock valuation',
+    'B2B Wholesale vs Counter Sales',
+    'List all supplier payables'
   ];
 
   const handleSend = (textToSend?: string) => {
@@ -63,128 +80,137 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
       let responseMsg: AgentExecutionMessage;
       const lower = query.toLowerCase();
 
-      if (lower.includes('sales summary') || lower.includes('sales')) {
+      if (lower.includes('low stock') || lower.includes('reorder') || lower.includes('stock alert')) {
+        const count = lowStockAlerts.length;
+        const totalReorderEst = lowStockAlerts.reduce((s, a) => s + a.estimatedReorderCost, 0);
+
+        const itemsList = lowStockAlerts.slice(0, 4).map((a, i) => 
+          `${i + 1}. **${a.name}** (${a.sku})\n   • Current Main Stock: **${a.currentStock} units** (Threshold: ${a.threshold})\n   • Recommended Reorder: **+${a.deficitQuantity} units** from *${a.preferredVendorName}*\n   • Est. Cost: ₹${a.estimatedReorderCost.toLocaleString('en-IN')}`
+        ).join('\n\n');
+
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
-          agentName: 'DMK Business Copilot',
-          content: '📊 **Sales Summary & Performance (MTD August 2026)**:\n\n• **Gross Revenue**: ₹48,25,000 (117 Invoices)\n• **Total Received**: ₹39,80,000\n• **Outstanding Receivables**: ₹8,45,000\n• **Top Vertical**: DMK Plastics Chairs (42% share)\n• **Average Invoice Value**: ₹41,239\n\nAll billing entries have auto-posted to General Ledger with zero variance.',
+          agentName: 'Inventory & SCM Agent',
+          content: `🚨 **Live Low-Stock Alert Analysis (${count} SKUs Below Safety Level)**:\n\n${itemsList || 'All inventory stock levels are currently optimal!'}\n\n📦 **Total Estimated Reorder Sourcing Cost**: **₹${totalReorderEst.toLocaleString('en-IN')}**\n\nWould you like me to auto-generate draft Purchase Orders for these suppliers?`,
           timestamp: 'Just now',
-          confidenceScore: 0.995,
+          confidenceScore: 0.994,
           planSteps: [
-            { stepId: 1, assignedAgent: 'AI Copilot', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_dashboard(companyId="comp-01")', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 2, assignedAgent: 'AI Copilot', actionVerb: 'AGGREGATE_SALES', description: 'Summed BillingLine entries across 4 categories', status: 'COMPLETED', requiresHumanApproval: false }
+            { stepId: 1, assignedAgent: 'Inventory Agent', actionVerb: 'EVALUATE_STOCK_THRESHOLDS', description: 'Scanned 2,320 catalog SKUs against safety reorder limits', status: 'COMPLETED', requiresHumanApproval: false },
+            { stepId: 2, assignedAgent: 'SCM Agent', actionVerb: 'MATCH_PREFERRED_SUPPLIER', description: 'Mapped low-stock SKUs to Nilkamal and Supreme manufacturer accounts', status: 'COMPLETED', requiresHumanApproval: false }
           ],
           reasoningTrace: [
-            'Tool get_dashboard returned MTD revenue ₹48.25L',
-            'Compared with previous month (+14.2% MoM growth)',
-            'Identified 0 overdue unpaid invoices past 60 days'
+            `Identified ${count} items where main stock <= threshold`,
+            'Calculated deficit quantity considering warehouse lead times',
+            'Cross-checked supplier catalog availability'
           ]
         };
-      } else if (lower.includes('low stock') || lower.includes('stock') || lower.includes('reorder')) {
+      } else if (lower.includes('ishwar mule') || lower.includes('latur') || lower.includes('customer balance')) {
+        const cust = customers.find(c => c.partyName.toLowerCase().includes('ishwar mule')) || customers[0];
+
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
-          agentName: 'SCM & Sourcing Agent',
-          content: '⚠️ **Low Stock Alert (3 Items Below Dynamic Reorder Level)**:\n\n1. **DMK Royal High-Back Arm Chair**: 45 Pcs (Reorder Level: 100 Pcs)\n2. **DMK 20L Heavy-Duty Utility Bucket**: 28 Pcs (Reorder Level: 80 Pcs)\n3. **Virgin Polypropylene (PP) Granules**: 1,200 kg (Reorder Level: 3,000 kg)\n\nEstimated PO Cost to Restock: **₹2,45,000**.',
-          timestamp: 'Just now',
-          confidenceScore: 0.988,
-          planSteps: [
-            { stepId: 1, assignedAgent: 'SCM Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: search_products(lowStock=true)', status: 'COMPLETED', requiresHumanApproval: false },
-            { stepId: 2, assignedAgent: 'SCM Agent', actionVerb: 'CALCULATE_ROP', description: 'Computed dynamic safety stock across 580 catalog items', status: 'COMPLETED', requiresHumanApproval: false }
-          ],
-          reasoningTrace: [
-            'Daily moulding machine consumption: 250kg PP granules/day',
-            'Vendor delivery lead time: 4 business days',
-            'Generated draft Purchase Order PO-2026-092 for polymer supplier'
-          ],
-          suggestedAction: {
-            label: 'Draft Restock Purchase Order (₹2,45,000)',
-            actionType: 'APPROVE_PO',
-            payload: { poNumber: 'PO-2026-092', amount: 245000 }
-          }
-        };
-      } else if (lower.includes('cash') || lower.includes('liquidity') || lower.includes('position')) {
-        responseMsg = {
-          id: `msg-${Date.now() + 1}`,
-          sender: 'agent',
-          agentName: 'Financial Controller Agent',
-          content: '💰 **DMK Mart Live Cash & Liquidity Position**:\n\n• **HDFC Current Operating A/c**: ₹10,00,000\n• **Cash in Hand (Factory Counter)**: ₹4,65,000\n• **Total Liquid Cash**: **₹14,65,000**\n• **Expected Inflow (Next 7 Days)**: ₹6,80,000 (Customer Receivables)\n• **Upcoming GST Cash Liability**: ₹1,73,500 (Due 20th August)',
+          agentName: 'Finance & Ledger Agent',
+          content: `👤 **Customer Profile & Ledger Balance: ${cust.partyName}**\n\n• **City Location**: ${cust.city} (State: ${cust.stateCode})\n• **GSTIN**: ${cust.gstin || 'N/A'}\n• **Phone**: ${cust.phone}\n• **Assigned Pricing Tier**: ${cust.assignedTier.replace('_', ' ').toUpperCase()}\n• **Opening Balance**: ₹${(cust.openingBalance || 0).toLocaleString('en-IN')} (Dr)\n• **Live Closing Balance (Receivable)**: **₹${cust.closingBalance.toLocaleString('en-IN')} (Dr)**\n• **Credit Limit**: ₹${cust.creditLimit.toLocaleString('en-IN')} (Utilization: ${((cust.closingBalance / (cust.creditLimit || 1)) * 100).toFixed(1)}%)\n\nAccount is in good standing with active wholesale orders.`,
           timestamp: 'Just now',
           confidenceScore: 0.998,
           planSteps: [
-            { stepId: 1, assignedAgent: 'Finance Controller', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_cash_position()', status: 'COMPLETED', requiresHumanApproval: false }
+            { stepId: 1, assignedAgent: 'Ledger Agent', actionVerb: 'FETCH_PARTY_LEDGER', description: `Queried partyLedgers['${cust.id}'] in ERP Context`, status: 'COMPLETED', requiresHumanApproval: false },
+            { stepId: 2, assignedAgent: 'Finance Agent', actionVerb: 'COMPUTE_CLOSING_BALANCE', description: 'Calculated Opening Bal + Billed Invoices - Payments - Credit Notes', status: 'COMPLETED', requiresHumanApproval: false }
           ],
           reasoningTrace: [
-            'Queried Account 10000 (Cash) and Account 10001 (Bank)',
-            'Net liquidity ratio = 4.2x monthly fixed overheads (Excellent)'
+            `Retrieved live ledger for ${cust.partyName}`,
+            `Opening debit: ₹${(cust.openingBalance || 0).toLocaleString('en-IN')}`,
+            `Net current outstanding receivable: ₹${cust.closingBalance.toLocaleString('en-IN')}`
           ]
         };
-      } else if (lower.includes('top selling') || lower.includes('top product') || lower.includes('popular')) {
+      } else if (lower.includes('damaged') || lower.includes('broken') || lower.includes('defective') || lower.includes('return')) {
+        let totalDamagedUnits = 0;
+        let damagedValuation = 0;
+        const damagedItems: string[] = [];
+
+        products.forEach(p => {
+          if (p.damagedStock > 0) {
+            totalDamagedUnits += p.damagedStock;
+            damagedValuation += p.damagedStock * p.purchaseBaseCost;
+            damagedItems.push(`• **${p.name}**: ${p.damagedStock} units (Supplier: *${p.manufacturerName || 'Direct'}*)`);
+          }
+        });
+
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
-          agentName: 'Sales Intelligence Agent',
-          content: '🏆 **Top 5 Best-Selling Plastic Products (By Volume & Revenue)**:\n\n1. **DMK Royal High-Back Arm Chair** (1,450 Pcs • ₹5,51,000)\n2. **DMK 20L Heavy-Duty Utility Bucket** (2,100 Pcs • ₹3,78,000)\n3. **DMK Industrial Heavy Perforated Crate** (620 Pcs • ₹3,59,600)\n4. **DMK 100L Heavy Waste Dustbin** (340 Pcs • ₹2,38,000)\n5. **DMK 6-Piece Transparent Spice Jar Set** (1,200 Sets • ₹2,16,000)',
+          agentName: 'Quality & Returns Agent',
+          content: `🛡️ **Damaged & Broken Stock Status**:\n\n• **Total Quarantined Broken Units**: **${totalDamagedUnits} Units**\n• **Total Asset Loss Valuation**: **₹${damagedValuation.toLocaleString('en-IN')}**\n\n**Breakdown by Product**:\n${damagedItems.join('\n')}\n\n**Recommendation**: These damaged items were placed into segregated Damaged Stock from customer returns. You can issue a **Purchase Return (Debit Note)** in the Purchase module to return them to the original manufacturers for full financial credit!`,
           timestamp: 'Just now',
           confidenceScore: 0.992,
           planSteps: [
-            { stepId: 1, assignedAgent: 'Sales Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_billing(topProducts=true)', status: 'COMPLETED', requiresHumanApproval: false }
+            { stepId: 1, assignedAgent: 'Warehouse Agent', actionVerb: 'QUERY_DAMAGED_STOCK_POOL', description: 'Filtered products with damagedStock > 0', status: 'COMPLETED', requiresHumanApproval: false },
+            { stepId: 2, assignedAgent: 'Finance Agent', actionVerb: 'ESTIMATE_DEBIT_NOTE_RECOVERY', description: 'Computed recoverable vendor credit via base procurement cost', status: 'COMPLETED', requiresHumanApproval: false }
+          ],
+          reasoningTrace: [
+            'Verified segregated stock isolation (Main Sellable vs Damaged)',
+            `Found ${totalDamagedUnits} total defective units`,
+            'Generated recovery path via Supplier Purchase Returns'
           ]
         };
-      } else if (lower.includes('trial balance') || lower.includes('audit') || lower.includes('bookkeeping')) {
+      } else if (lower.includes('counter') || lower.includes('b2b') || lower.includes('b2c') || lower.includes('walk-in')) {
+        const b2bTotal = allInvoices.filter(i => !i.isCounterSale).reduce((s, i) => s + i.grandTotal, 0);
+        const b2cTotal = allInvoices.filter(i => i.isCounterSale).reduce((s, i) => s + i.grandTotal, 0);
+        const counterBuyersCount = counterCustomers.length;
+
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
           sender: 'agent',
-          agentName: 'Auditor Agent',
-          content: '⚖️ **Trial Balance & Double-Entry Integrity Check**:\n\n• **Total Debit Balances**: ₹31,13,500.00\n• **Total Credit Balances**: ₹31,13,500.00\n• **Variance**: **₹0.00 (100% In Equilibrium)**\n• **Accounts Audited**: 17 Chart of Accounts\n• **Status**: Double-entry books are completely balanced and compliant with Indian Accounting Standards.',
+          agentName: 'Commercial Analytics Agent',
+          content: `📊 **B2B Wholesale vs. B2C Counter Retail Analysis**:\n\n• **B2B Wholesale Billing**: **₹${b2bTotal.toLocaleString('en-IN')}** (${allInvoices.filter(i => !i.isCounterSale).length} Consignment Invoices)\n• **B2C Counter Retail Sales**: **₹${b2cTotal.toLocaleString('en-IN')}** (${allInvoices.filter(i => i.isCounterSale).length} Walk-in Receipts)\n• **Registered Counter Buyers in Directory**: **${counterBuyersCount} Walk-in Buyers**\n\n**Key Insight**: B2B bulk invoicing represents ${((b2bTotal / ((b2bTotal + b2cTotal) || 1)) * 100).toFixed(1)}% of revenue with automatic bulk tier discounts applied on Sets (10) and Crates (24).`,
           timestamp: 'Just now',
-          confidenceScore: 1.0,
+          confidenceScore: 0.989,
           planSteps: [
-            { stepId: 1, assignedAgent: 'Auditor Agent', actionVerb: 'EXECUTE_TOOL', description: 'Tool called: get_trial_balance()', status: 'COMPLETED', requiresHumanApproval: false }
+            { stepId: 1, assignedAgent: 'Analytics Agent', actionVerb: 'SEGREGATE_COMMERCE_STREAMS', description: 'Split invoice records by isCounterSale flag', status: 'COMPLETED', requiresHumanApproval: false }
+          ],
+          reasoningTrace: [
+            'Calculated real-time stream aggregation across active tenant invoices',
+            'Evaluated counter buyer retention metrics'
+          ]
+        };
+      } else if (lower.includes('supplier') || lower.includes('payable') || lower.includes('vendor')) {
+        const totalPayables = vendors.reduce((s, v) => s + v.closingBalance, 0);
+        const vendorList = vendors.map(v => 
+          `• **${v.name}** (${v.partyType}): **₹${v.closingBalance.toLocaleString('en-IN')}** (Cr) [Terms: ${v.creditTermsDays} Days]`
+        ).join('\n');
+
+        responseMsg = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'agent',
+          agentName: 'Finance Sourcing Agent',
+          content: `🏢 **Supplier Accounts Payable (Total: ₹${totalPayables.toLocaleString('en-IN')})**:\n\n${vendorList}\n\nAll PO inward receipts have auto-credited the vendor accounts. Pending payments can be disbursed directly via NEFT/UPI in the Purchase Management module.`,
+          timestamp: 'Just now',
+          confidenceScore: 0.996,
+          planSteps: [
+            { stepId: 1, assignedAgent: 'Finance Agent', actionVerb: 'SCAN_VENDOR_LEDGERS', description: 'Aggregated closing balances for all Manufacturers and Distributors', status: 'COMPLETED', requiresHumanApproval: false }
+          ],
+          reasoningTrace: [
+            `Total active vendors: ${vendors.length}`,
+            `Net liability payable: ₹${totalPayables.toLocaleString('en-IN')}`
           ]
         };
       } else {
         responseMsg = {
           id: `msg-${Date.now() + 1}`,
-          sender: 'orchestrator',
-          agentName: 'Master Orchestrator',
-          content: `Processed natural language prompt. Telemetry verified across DMK Mart databases. All invariants balanced with 0.00 discrepancy.`,
+          sender: 'agent',
+          agentName: 'DMK Master Orchestrator',
+          content: `I've analyzed your query regarding "${query}".\n\n• **Active Sellable Stock**: ${products.reduce((s, p) => s + p.stockQuantity, 0).toLocaleString('en-IN')} units\n• **Damaged Quarantined Stock**: ${products.reduce((s, p) => s + p.damagedStock, 0)} units\n• **Active B2B Clients**: ${customers.length} Accounts\n• **Suppliers**: ${vendors.length} Vendors\n• **Double-Entry Ledgers**: Balanced with ₹0.00 variance\n\nHow else can I assist your operations?`,
           timestamp: 'Just now',
-          confidenceScore: 0.97,
-          reasoningTrace: [
-            'Queried real-time multi-dimensional trial balance across all subsidiaries',
-            'Sales revenue on track (+14.2% MoM growth)',
-            'Zero anomalous journal entries flagged in past 24 hours'
-          ]
+          confidenceScore: 0.975
         };
       }
 
       setMessages(prev => [...prev, responseMsg]);
       setIsProcessing(false);
-    }, 900);
-  };
-
-  const handleApproveAction = (msgId: string) => {
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#FF6B00', '#FF851B', '#FFFFFF', '#00E5FF']
-    });
-
-    setMessages(prev => prev.map(m => {
-      if (m.id === msgId && m.planSteps) {
-        const updatedSteps = m.planSteps.map(s => s.status === 'AWAITING_APPROVAL' ? { ...s, status: 'COMPLETED' as const } : s);
-        return {
-          ...m,
-          planSteps: updatedSteps,
-          suggestedAction: undefined,
-          content: m.content + '\n\n✅ Transaction officially authorized and committed to immutable ledger.'
-        };
-      }
-      return m;
-    }));
+      confetti({ particleCount: 25, spread: 45 });
+    }, 600);
   };
 
   if (!isOpen) return null;
@@ -198,23 +224,23 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
         bottom: 0,
         width: '420px',
         backgroundColor: 'var(--bg-secondary)',
-        borderLeft: '1px solid var(--accent-orange-border)',
-        boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.75)',
-        zIndex: 50,
+        borderLeft: '1px solid var(--border-medium)',
+        boxShadow: 'var(--shadow-lg)',
+        zIndex: 1000,
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
       }}
     >
-      {/* Sidecar Header */}
+      {/* Drawer Header */}
       <div 
         style={{
-          height: 'var(--header-height)',
-          padding: '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: '16px 20px',
           borderBottom: '1px solid var(--border-subtle)',
-          background: 'linear-gradient(180deg, rgba(255, 107, 0, 0.12) 0%, transparent 100%)'
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'var(--bg-tertiary)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -227,31 +253,25 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 12px rgba(255, 107, 0, 0.4)'
+              color: '#FFF'
             }}
           >
-            <Bot size={18} color="#FFF" />
+            <Bot size={18} />
           </div>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFF' }}>
-              Autonomous Swarm Copilot
+            <div style={{ fontWeight: 800, fontSize: '14px', color: 'var(--text-primary)' }}>
+              DMK AI Copilot Swarm
             </div>
-            <div style={{ fontSize: '10px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }} />
-              Active Consensus Mesh
+            <div style={{ fontSize: '11px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981' }} />
+              Autonomous Enterprise Mesh Active
             </div>
           </div>
         </div>
 
         <button 
           onClick={onClose}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#FFFFFF',
-            cursor: 'pointer',
-            padding: '4px'
-          }}
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px' }}
         >
           <X size={18} />
         </button>
@@ -265,176 +285,145 @@ export const AgentSidecar: React.FC<AgentSidecarProps> = ({ isOpen, onClose }) =
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px'
+          gap: '14px'
         }}
       >
-        {messages.map(msg => (
-          <div 
-            key={msg.id}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-              gap: '6px'
-            }}
-          >
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {msg.agentName && <span style={{ color: 'var(--accent-orange)', fontWeight: 600 }}>{msg.agentName}</span>}
-              <span>{msg.timestamp}</span>
-              {msg.confidenceScore && (
-                <span className="status-pill status-pill-cyan" style={{ fontSize: '8px', padding: '1px 5px' }}>
-                  {(msg.confidenceScore * 100).toFixed(1)}% CONF
-                </span>
-              )}
-            </div>
-
+        {messages.map(msg => {
+          const isUser = msg.sender === 'user';
+          return (
             <div 
+              key={msg.id}
               style={{
-                maxWidth: '92%',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                background: msg.sender === 'user' 
-                  ? 'linear-gradient(135deg, #FF6B00 0%, #FF851B 100%)' 
-                  : 'var(--bg-tertiary)',
-                color: '#FFF',
-                fontSize: '13px',
-                lineHeight: '1.5',
-                border: msg.sender === 'user' ? 'none' : '1px solid var(--border-subtle)',
-                boxShadow: msg.sender === 'user' ? '0 4px 14px rgba(255, 107, 0, 0.3)' : 'none'
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: isUser ? 'flex-end' : 'flex-start',
+                gap: '4px'
               }}
             >
-              {msg.content}
+              {!isUser && (
+                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent-orange)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={11} /> {msg.agentName || 'Agent'}
+                </div>
+              )}
 
-              {/* Execution DAG Steps */}
-              {msg.planSteps && msg.planSteps.length > 0 && (
-                <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-orange-bright)', marginBottom: '8px' }}>
-                    EXECUTION DAG STEPS
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div 
+                style={{
+                  maxWidth: '90%',
+                  padding: '12px 14px',
+                  borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                  background: isUser ? 'linear-gradient(135deg, #FF6B00 0%, #FF851B 100%)' : 'var(--bg-tertiary)',
+                  color: isUser ? '#FFFFFF' : 'var(--text-primary)',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  border: isUser ? 'none' : '1px solid var(--border-subtle)',
+                  whiteSpace: 'pre-line'
+                }}
+              >
+                {msg.content}
+
+                {/* Plan steps if present */}
+                {msg.planSteps && msg.planSteps.length > 0 && (
+                  <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent-orange)', marginBottom: '4px' }}>
+                      Execution Plan Trace:
+                    </div>
                     {msg.planSteps.map(step => (
-                      <div 
-                        key={step.stepId}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          background: 'rgba(0, 0, 0, 0.25)',
-                          padding: '8px',
-                          borderRadius: '6px',
-                          fontSize: '11px'
-                        }}
-                      >
-                        {step.status === 'COMPLETED' && <CheckCircle2 size={15} color="#10B981" style={{ flexShrink: 0, marginTop: '1px' }} />}
-                        {step.status === 'AWAITING_APPROVAL' && <AlertTriangle size={15} color="#FFB020" style={{ flexShrink: 0, marginTop: '1px' }} />}
-                        <div>
-                          <div style={{ fontWeight: 600, color: '#FFF' }}>
-                            Step {step.stepId}: {step.actionVerb} ({step.assignedAgent})
-                          </div>
-                          <div style={{ color: 'var(--text-secondary)' }}>{step.description}</div>
-                        </div>
+                      <div key={step.stepId} style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        <CheckCircle2 size={12} color="#10B981" />
+                        <span>{step.description}</span>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* Suggested Action Button (Human in the Loop) */}
-              {msg.suggestedAction && (
-                <div style={{ marginTop: '12px' }}>
-                  <button 
-                    onClick={() => handleApproveAction(msg.id)}
-                    className="btn-primary"
-                    style={{ width: '100%', padding: '10px' }}
-                  >
-                    <ShieldCheck size={16} />
-                    <span>{msg.suggestedAction.label}</span>
-                  </button>
-                </div>
-              )}
+              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                {msg.timestamp}
+              </span>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {isProcessing && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-orange)', fontSize: '12px' }}>
-            <RefreshCw size={14} className="animate-spin-slow" />
-            <span>Agent Swarm synthesizing consensus...</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-orange)', fontSize: '12px', padding: '10px' }}>
+            <RefreshCw size={14} className="spin-animation" />
+            Analyzing multi-module telemetry & querying live state...
           </div>
         )}
       </div>
 
-      {/* Quick Prompts */}
-      <div style={{ padding: '10px 16px', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-subtle)' }}>
-        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
-          Suggested Directives
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {quickPrompts.map((qp, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSend(qp)}
-              style={{
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-subtle)',
-                color: 'var(--text-secondary)',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = '#FFF';
-                e.currentTarget.style.borderColor = 'var(--accent-orange)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = 'var(--text-secondary)';
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-              }}
-            >
-              {qp}
-            </button>
-          ))}
-        </div>
+      {/* Quick Prompts Carousel */}
+      <div style={{ padding: '8px 16px', background: 'var(--bg-tertiary)', borderTop: '1px solid var(--border-subtle)', overflowX: 'auto', display: 'flex', gap: '6px' }}>
+        {quickPrompts.map(p => (
+          <button
+            key={p}
+            onClick={() => handleSend(p)}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {p}
+          </button>
+        ))}
       </div>
 
-      {/* Input Area */}
-      <div 
+      {/* Input Form */}
+      <form 
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSend();
+        }}
         style={{
           padding: '14px 16px',
           borderTop: '1px solid var(--border-subtle)',
-          backgroundColor: 'var(--bg-secondary)',
           display: 'flex',
-          gap: '8px'
+          gap: '8px',
+          background: 'var(--bg-secondary)'
         }}
       >
-        <input 
+        <input
           type="text"
-          placeholder="Issue directive to agent swarm..."
+          placeholder="Ask AI Copilot anything..."
           value={inputPrompt}
-          onChange={e => setInputPrompt(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onChange={(e) => setInputPrompt(e.target.value)}
           style={{
             flex: 1,
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--border-subtle)',
+            padding: '10px 12px',
             borderRadius: '8px',
-            padding: '10px 14px',
-            color: '#FFF',
-            fontSize: '13px',
-            outline: 'none'
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-medium)',
+            color: 'var(--text-primary)',
+            fontSize: '13px'
           }}
         />
-        <button 
-          onClick={() => handleSend()}
+        <button
+          type="submit"
           disabled={!inputPrompt.trim() || isProcessing}
-          className="btn-primary"
-          style={{ padding: '0 16px' }}
+          style={{
+            padding: '0 16px',
+            borderRadius: '8px',
+            background: 'var(--accent-orange)',
+            border: 'none',
+            color: '#FFF',
+            cursor: !inputPrompt.trim() || isProcessing ? 'not-allowed' : 'pointer',
+            opacity: !inputPrompt.trim() || isProcessing ? 0.5 : 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         >
           <Send size={16} />
         </button>
-      </div>
+      </form>
+
     </div>
   );
 };

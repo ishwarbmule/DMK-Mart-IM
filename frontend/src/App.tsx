@@ -6,22 +6,14 @@ import { AgentSidecar } from './components/agent/AgentSidecar';
 import { AgentSwarmVisualizer } from './components/agent/AgentSwarmVisualizer';
 import { ExecutiveDashboard } from './components/modules/ExecutiveDashboard';
 import { MultiCompanyBillingModule } from './components/modules/MultiCompanyBillingModule';
-import { PlasticsProductMaster } from './components/modules/PlasticsProductMaster';
+import { PurchaseManagementModule } from './components/modules/PurchaseManagementModule';
+import { InventoryStockModule } from './components/modules/InventoryStockModule';
+import { CustomersManagementModule } from './components/modules/CustomersManagementModule';
 import { FinancialBookkeepingModule } from './components/modules/FinancialBookkeepingModule';
 import { DownloadableInvoiceViewer } from './components/modules/DownloadableInvoiceViewer';
-import { CustomersManagementModule } from './components/modules/CustomersManagementModule';
 import { ReportsModule } from './components/modules/ReportsModule';
 import { SettingsModule } from './components/modules/SettingsModule';
 import { POSTerminalModule } from './components/modules/POSTerminalModule';
-import { GSTBillingModule } from './components/modules/GSTBillingModule';
-import { FinanceModule } from './components/modules/FinanceModule';
-import { SupplyChainModule } from './components/modules/SupplyChainModule';
-import { WarehouseModule } from './components/modules/WarehouseModule';
-import { ManufacturingModule } from './components/modules/ManufacturingModule';
-import { HRMPayrollModule } from './components/modules/HRMPayrollModule';
-import { CRMCPQModule } from './components/modules/CRMCPQModule';
-import { DocumentAILab } from './components/modules/DocumentAILab';
-import { BPMNWorkflowModule } from './components/modules/BPMNWorkflowModule';
 import { ModuleKey, TenantInfo, FinalInvoiceData } from './types/erp';
 import { ERPDataProvider, useERPData } from './context/ERPContext';
 import { CheckCircle2, X } from 'lucide-react';
@@ -36,8 +28,9 @@ const AppContent: React.FC = () => {
     setFeedbackBanner 
   } = useERPData();
 
-  const [activeModule, setActiveModule] = useState<ModuleKey>('typeahead_billing');
+  const [activeModule, setActiveModule] = useState<ModuleKey>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidecarOpen, setIsSidecarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
@@ -60,7 +53,7 @@ const AppContent: React.FC = () => {
   };
 
   const handlePostToLedger = (_invoiceData: FinalInvoiceData) => {
-    // Already handled globally by addFastOrderBill in ERPContext
+    // Already handled globally in ERPContext
   };
 
   const renderActiveModule = () => {
@@ -75,8 +68,17 @@ const AppContent: React.FC = () => {
             onPostToLedger={handlePostToLedger}
           />
         );
-      case 'plastics_catalog':
-        return <PlasticsProductMaster />;
+      case 'purchase_management':
+      case 'purchase_orders':
+        return <PurchaseManagementModule initialSubSection="purchase_orders" />;
+      case 'purchase_returns':
+        return <PurchaseManagementModule initialSubSection="purchase_returns" />;
+      case 'vendor_payments':
+        return <PurchaseManagementModule initialSubSection="vendor_payments" />;
+      case 'vendors_directory':
+        return <PurchaseManagementModule initialSubSection="vendors_directory" />;
+      case 'inventory_stock':
+        return <InventoryStockModule />;
       case 'customers':
         return <CustomersManagementModule onViewCustomerInvoice={handleViewGeneratedInvoice} />;
       case 'bookkeeping':
@@ -94,34 +96,10 @@ const AppContent: React.FC = () => {
         );
       case 'pos':
         return <POSTerminalModule />;
-      case 'gst_billing':
-        return <GSTBillingModule />;
       case 'swarm_visualizer':
         return <AgentSwarmVisualizer />;
-      case 'finance':
-        return <FinanceModule />;
-      case 'scm':
-        return <SupplyChainModule />;
-      case 'wms':
-        return <WarehouseModule />;
-      case 'mes':
-        return <ManufacturingModule />;
-      case 'hcm':
-        return <HRMPayrollModule />;
-      case 'crm':
-        return <CRMCPQModule />;
-      case 'doc_ai':
-        return <DocumentAILab />;
-      case 'bpmn':
-        return <BPMNWorkflowModule />;
       default:
-        return (
-          <MultiCompanyBillingModule 
-            activeCompany={activeCompany} 
-            onViewInvoice={handleViewGeneratedInvoice}
-            onPostToLedger={handlePostToLedger}
-          />
-        );
+        return <ExecutiveDashboard onSelectModule={setActiveModule} onOpenSidecar={() => setIsSidecarOpen(true)} />;
     }
   };
 
@@ -169,10 +147,12 @@ const AppContent: React.FC = () => {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isSidecarOpen={isSidecarOpen}
         onToggleSidecar={() => setIsSidecarOpen(!isSidecarOpen)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowX: 'hidden' }}>
         <Header 
           tenant={tenant}
           activeCompany={activeCompany}
@@ -180,9 +160,10 @@ const AppContent: React.FC = () => {
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onToggleSidecar={() => setIsSidecarOpen(!isSidecarOpen)}
           isSidecarOpen={isSidecarOpen}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
         />
 
-        <main style={{ flex: 1, padding: '24px', maxWidth: '1600px', width: '100%', margin: '0 auto' }}>
+        <main className="app-main-content">
           {renderActiveModule()}
         </main>
       </div>
@@ -213,4 +194,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

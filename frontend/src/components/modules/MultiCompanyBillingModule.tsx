@@ -26,7 +26,9 @@ import {
   Percent,
   Layers,
   Scale,
-  Minus
+  Minus,
+  User,
+  ShieldAlert
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -35,12 +37,13 @@ import {
   CompanyVertical, 
   CustomerParty, 
   BilledLineItem, 
-  FinalInvoiceData 
+  FinalInvoiceData,
+  SalesReturn,
+  SalesReturnItem,
+  DamageDefectType
 } from '../../types/erp';
-import { INITIAL_PLASTICS_CATALOG } from '../../data/plasticsCatalog';
-import { DMK_MART_COMPANY, MOCK_CUSTOMERS } from '../../data/multiCompanyData';
 import { useERPData } from '../../context/ERPContext';
-import { formatDate, formatFullDate } from '../../utils/dateUtils';
+import { formatDate, formatFullDate, getTodayISODate } from '../../utils/dateUtils';
 
 interface MultiCompanyBillingModuleProps {
   activeCompany: CompanyVertical;
@@ -56,918 +59,1736 @@ export const MultiCompanyBillingModule: React.FC<MultiCompanyBillingModuleProps>
   const { 
     products: catalog, 
     customers, 
+    counterCustomers,
     addFastOrderBill, 
     addCustomer: addGlobalCustomer,
-    setCurrentInvoice
+    addCounterCustomer,
+    createSalesReturn,
+    calculateBulkPricing
   } = useERPData();
 
+  // Mode: B2B Enterprise Invoicing vs B2C Walk-in Counter Sales
+  const [billingMode, setBillingMode] = useState<'B2B' | 'B2C_COUNTER'>('B2B');
+
+  // Customer Selection (B2B)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(customers[0]?.id || 'cust-01');
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId) || customers[0];
 
-  const [invoiceNumber, setInvoiceNumber] = useState<string>(
-    `${activeCompany.invoicePrefix}${Math.floor(1000 + Math.random() * 9000)}`
-  );
-  const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [paymentMode, setPaymentMode] = useState<'CREDIT_30_DAYS' | 'CASH' | 'NEFT_RTGS' | 'UPI'>('CREDIT_30_DAYS');
+  // B2C Walk-in Customer Selection
+  const [counterSearchQuery, setCounterSearchQuery] = useState('');
+  const [selectedCounterBuyer, setSelectedCounterBuyer] = useState<{ name: string; phone: string; city: string } | null>(null);
+  const [showCounterBuyerDropdown, setShowCounterBuyerDropdown] = useState(false);
 
-  // Customer Modal State
-  const [showAddCustomerModal, setShowAddCustomerModal] = useState<boolean>(false);
-  const [newCustName, setNewCustName] = useState<string>('');
-  const [newCustGstin, setNewCustGstin] = useState<string>('');
-  const [newCustStateCode, setNewCustStateCode] = useState<string>('33');
-  const [newCustPhone, setNewCustPhone] = useState<string>('');
-  const [newCustCity, setNewCustCity] = useState<string>('');
-  const [newCustType, setNewCustType] = useState<any>('WHOLESALER');
-  const [newCustTier, setNewCustTier] = useState<PricingTierKey>('tier2_wholesale');
-  const [newCustOpeningBal, setNewCustOpeningBal] = useState<number>(0);
+  // Quick Add B2C Customer Modal
+  const [showAddCounterModal, setShowAddCounterModal] = useState(false);
+  const [newCounterName, setNewCounterName] = useState('');
+  const [newCounterPhone, setNewCounterPhone] = useState('');
+  const [newCounterCity, setNewCounterCity] = useState('Local');
 
-  // Type-ahead search state
-  const [typeaheadQuery, setTypeaheadQuery] = useState<string>('');
-  const [showTypeaheadDropdown, setShowTypeaheadDropdown] = useState<boolean>(false);
-  const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
-  const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
-
-  // Billed Lines Initial State
-  const [lines, setLines] = useState<BilledLineItem[]>([
+  // Sales Return (Damaged Goods) Modal
+  const [showSalesReturnModal, setShowSalesReturnModal] = useState(false);
+  const [srCustomerId, setSrCustomerId] = useState(customers[0]?.id || 'cust-01');
+  const [srInvoiceRef, setSrInvoiceRef] = useState('DMK/26-27/4010');
+  const [srDamageType, setSrDamageType] = useState<DamageDefectType>('CRACKED');
+  const [srNotes, setSrNotes] = useState('Defective item returned by customer; quarantined to damaged stock');
+  const [srLines, setSrLines] = useState<Array<{
+    productId: string;
+    productSku: string;
+    productName: string;
+    damagedQuantity: number;
+    unitPrice: number;
+    gstRate: number;
+  }>>([
     {
-      id: '1',
-      product: catalog[0] || INITIAL_PLASTICS_CATALOG[0],
-      selectedTier: 'tier1_distributor',
-      unitPrice: (catalog[0] || INITIAL_PLASTICS_CATALOG[0]).pricing.tier1_distributor,
-      quantity: 50,
-      unitOfMeasure: (catalog[0] || INITIAL_PLASTICS_CATALOG[0]).unitOfMeasure,
-      discountPct: 0,
-      taxableAmount: (catalog[0] || INITIAL_PLASTICS_CATALOG[0]).pricing.tier1_distributor * 50,
-      gstRate: (catalog[0] || INITIAL_PLASTICS_CATALOG[0]).gstRate,
-      cgstAmount: ((catalog[0] || INITIAL_PLASTICS_CATALOG[0]).pricing.tier1_distributor * 50 * 0.18) / 2,
-      sgstAmount: ((catalog[0] || INITIAL_PLASTICS_CATALOG[0]).pricing.tier1_distributor * 50 * 0.18) / 2,
-      igstAmount: 0,
-      totalAmount: ((catalog[0] || INITIAL_PLASTICS_CATALOG[0]).pricing.tier1_distributor * 50) * 1.18
-    },
-    {
-      id: '2',
-      product: catalog[1] || INITIAL_PLASTICS_CATALOG[1],
-      selectedTier: 'tier1_distributor',
-      unitPrice: (catalog[1] || INITIAL_PLASTICS_CATALOG[1]).pricing.tier1_distributor,
-      quantity: 30,
-      unitOfMeasure: (catalog[1] || INITIAL_PLASTICS_CATALOG[1]).unitOfMeasure,
-      discountPct: 0,
-      taxableAmount: (catalog[1] || INITIAL_PLASTICS_CATALOG[1]).pricing.tier1_distributor * 30,
-      gstRate: (catalog[1] || INITIAL_PLASTICS_CATALOG[1]).gstRate,
-      cgstAmount: ((catalog[1] || INITIAL_PLASTICS_CATALOG[1]).pricing.tier1_distributor * 30 * 0.18) / 2,
-      sgstAmount: ((catalog[1] || INITIAL_PLASTICS_CATALOG[1]).pricing.tier1_distributor * 30 * 0.18) / 2,
-      igstAmount: 0,
-      totalAmount: ((catalog[1] || INITIAL_PLASTICS_CATALOG[1]).pricing.tier1_distributor * 30) * 1.18
+      productId: catalog[0]?.id || 'p-01',
+      productSku: catalog[0]?.sku || 'DMK-CHR-ROYAL',
+      productName: catalog[0]?.name || 'DMK Royal High-Back Arm Chair',
+      damagedQuantity: 2,
+      unitPrice: catalog[0]?.pricing.tier2_wholesale || 420.00,
+      gstRate: catalog[0]?.gstRate || 18
     }
   ]);
 
-  const isIntraState = selectedCustomer?.stateCode === activeCompany.stateCode;
+  // Invoice Metadata
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(
+    `${activeCompany.invoicePrefix}${Math.floor(1000 + Math.random() * 9000)}`
+  );
+  const [invoiceDate, setInvoiceDate] = useState<string>(getTodayISODate());
+  const [paymentMode, setPaymentMode] = useState<'CREDIT_30_DAYS' | 'CASH' | 'NEFT_RTGS' | 'UPI'>(
+    billingMode === 'B2B' ? 'CREDIT_30_DAYS' : 'CASH'
+  );
 
-  // Filter products as user types
-  const matchingProducts = catalog.filter(p => {
-    if (!typeaheadQuery.trim()) return false;
-    const q = typeaheadQuery.toLowerCase();
-    return p.name.toLowerCase().includes(q) || 
-           p.sku.toLowerCase().includes(q) || 
-           p.category.toLowerCase().includes(q) ||
-           (p.barcode && p.barcode.toLowerCase().includes(q));
-  }).slice(0, 8);
+  // Customer Modal State (B2B)
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState<boolean>(false);
+  const [newCustCity, setNewCustCity] = useState<string>('Latur');
+  const [newCustRawName, setNewCustRawName] = useState<string>('');
+  const [newCustGstin, setNewCustGstin] = useState<string>('');
+  const [newCustStateCode, setNewCustStateCode] = useState<string>('27');
+  const [newCustPhone, setNewCustPhone] = useState<string>('');
+  const [newCustTier, setNewCustTier] = useState<PricingTierKey>('tier2_wholesale');
+  const [newCustOpeningBal, setNewCustOpeningBal] = useState<number>(0);
+  const [newCustCreditLimit, setNewCustCreditLimit] = useState<number>(250000);
 
-  const handleSelectProduct = (product: PlasticProductItem) => {
-    const tier = selectedCustomer ? selectedCustomer.assignedTier : 'tier2_wholesale';
-    const price = product.pricing[tier];
-    const defaultQty = 20;
-    const taxable = price * defaultQty;
-    const taxAmt = taxable * (product.gstRate / 100);
+  // Type-ahead product search state
+  const [typeaheadQuery, setTypeaheadQuery] = useState<string>('');
+  const [showTypeaheadDropdown, setShowTypeaheadDropdown] = useState<boolean>(false);
 
-    const newLine: BilledLineItem = {
-      id: `${Date.now()}-${Math.random()}`,
-      product,
-      selectedTier: tier,
-      unitPrice: price,
-      quantity: defaultQty,
-      unitOfMeasure: product.unitOfMeasure,
+  // Initial Billed Lines
+  const defaultTier: PricingTierKey = billingMode === 'B2B' ? (selectedCustomer?.assignedTier || 'tier2_wholesale') : 'tier5_mrp';
+  const initBulk = calculateBulkPricing(catalog[0], defaultTier, 50);
+
+  const [lines, setLines] = useState<BilledLineItem[]>([
+    {
+      id: '1',
+      product: catalog[0],
+      selectedTier: defaultTier,
+      packagingFormat: initBulk.packagingFormat,
+      unitPrice: initBulk.unitPrice,
+      baseTierPrice: initBulk.baseTierPrice,
+      bulkDiscountPct: initBulk.bulkDiscountPct,
+      bulkSavingsRupees: initBulk.bulkSavingsRupees,
+      quantity: 50,
+      unitOfMeasure: catalog[0].unitOfMeasure,
       discountPct: 0,
-      taxableAmount: taxable,
-      gstRate: product.gstRate,
-      cgstAmount: isIntraState ? taxAmt / 2 : 0,
-      sgstAmount: isIntraState ? taxAmt / 2 : 0,
-      igstAmount: isIntraState ? 0 : taxAmt,
-      totalAmount: taxable + taxAmt
-    };
+      taxableAmount: initBulk.unitPrice * 50,
+      gstRate: catalog[0].gstRate,
+      cgstAmount: (initBulk.unitPrice * 50 * (catalog[0].gstRate / 100)) / 2,
+      sgstAmount: (initBulk.unitPrice * 50 * (catalog[0].gstRate / 100)) / 2,
+      igstAmount: 0,
+      totalAmount: (initBulk.unitPrice * 50) * (1 + catalog[0].gstRate / 100)
+    }
+  ]);
 
-    setLines(prev => [...prev, newLine]);
-    setTypeaheadQuery('');
-    setShowTypeaheadDropdown(false);
-    setFeedbackNotice(`Added "${product.name}" at Tier ${tier.replace('tier', 'T')} (₹${price}/unit)`);
-    setTimeout(() => setFeedbackNotice(null), 3000);
-  };
+  // Update payment mode default on mode change
+  useEffect(() => {
+    if (billingMode === 'B2C_COUNTER') {
+      setPaymentMode('CASH');
+    } else {
+      setPaymentMode('CREDIT_30_DAYS');
+    }
+  }, [billingMode]);
 
-  const handleUpdateLine = (id: string, updates: Partial<BilledLineItem>) => {
-    setLines(prev => prev.map(line => {
-      if (line.id !== id) return line;
+  // Filtered Counter Buyers
+  const filteredCounterBuyers = useMemo(() => {
+    const q = counterSearchQuery.toLowerCase();
+    if (!q) return counterCustomers;
+    return counterCustomers.filter(c => 
+      c.name.toLowerCase().includes(q) || 
+      c.phone.includes(q) || 
+      c.city.toLowerCase().includes(q)
+    );
+  }, [counterCustomers, counterSearchQuery]);
 
-      const merged = { ...line, ...updates };
-      if (updates.selectedTier) {
-        merged.unitPrice = merged.product.pricing[updates.selectedTier];
+  // Calculations
+  const calculations = useMemo(() => {
+    let subtotalTaxable = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+    let totalBulkSavings = 0;
+
+    const isIntraState = selectedCustomer.stateCode === activeCompany.stateCode || billingMode === 'B2C_COUNTER';
+
+    lines.forEach(line => {
+      subtotalTaxable += line.taxableAmount;
+      totalBulkSavings += (line.bulkSavingsRupees || 0);
+      
+      const lineGst = line.taxableAmount * (line.gstRate / 100);
+      if (isIntraState) {
+        totalCGST += lineGst / 2;
+        totalSGST += lineGst / 2;
+      } else {
+        totalIGST += lineGst;
       }
+    });
 
-      const rawAmount = merged.unitPrice * merged.quantity;
-      const discountedTaxable = rawAmount * (1 - (merged.discountPct || 0) / 100);
-      const taxAmt = discountedTaxable * (merged.gstRate / 100);
+    const rawGrandTotal = subtotalTaxable + totalCGST + totalSGST + totalIGST;
+    const grandTotal = Math.round(rawGrandTotal);
+    const roundOff = Number((grandTotal - rawGrandTotal).toFixed(2));
 
-      merged.taxableAmount = discountedTaxable;
-      merged.cgstAmount = isIntraState ? taxAmt / 2 : 0;
-      merged.sgstAmount = isIntraState ? taxAmt / 2 : 0;
-      merged.igstAmount = isIntraState ? 0 : taxAmt;
-      merged.totalAmount = discountedTaxable + taxAmt;
+    return {
+      subtotalTaxable,
+      totalCGST,
+      totalSGST,
+      totalIGST,
+      totalBulkSavings,
+      roundOff,
+      grandTotal
+    };
+  }, [lines, selectedCustomer, activeCompany, billingMode]);
 
-      return merged;
+  // Update line quantity and recalculate volume-based bulk discount automatically
+  const handleQuantityChange = (lineId: string, qty: number) => {
+    const validQty = Math.max(1, qty);
+    setLines(prev => prev.map(line => {
+      if (line.id === lineId) {
+        const bulk = calculateBulkPricing(line.product, line.selectedTier, validQty);
+        const taxableAmount = bulk.unitPrice * validQty * (1 - line.discountPct / 100);
+        const gstTotal = taxableAmount * (line.gstRate / 100);
+        const isIntraState = selectedCustomer.stateCode === activeCompany.stateCode || billingMode === 'B2C_COUNTER';
+
+        return {
+          ...line,
+          quantity: validQty,
+          packagingFormat: bulk.packagingFormat,
+          unitPrice: bulk.unitPrice,
+          baseTierPrice: bulk.baseTierPrice,
+          bulkDiscountPct: bulk.bulkDiscountPct,
+          bulkSavingsRupees: bulk.bulkSavingsRupees,
+          taxableAmount,
+          cgstAmount: isIntraState ? gstTotal / 2 : 0,
+          sgstAmount: isIntraState ? gstTotal / 2 : 0,
+          igstAmount: !isIntraState ? gstTotal : 0,
+          totalAmount: taxableAmount + gstTotal
+        };
+      }
+      return line;
     }));
   };
 
-  const handleAdjustQty = (id: string, delta: number) => {
-    const target = lines.find(l => l.id === id);
-    if (!target) return;
-    const newQty = Math.max(1, target.quantity + delta);
-    handleUpdateLine(id, { quantity: newQty });
+  // Change Tier
+  const handleTierChange = (lineId: string, tier: PricingTierKey) => {
+    setLines(prev => prev.map(line => {
+      if (line.id === lineId) {
+        const bulk = calculateBulkPricing(line.product, tier, line.quantity);
+        const taxableAmount = bulk.unitPrice * line.quantity * (1 - line.discountPct / 100);
+        const gstTotal = taxableAmount * (line.gstRate / 100);
+        const isIntraState = selectedCustomer.stateCode === activeCompany.stateCode || billingMode === 'B2C_COUNTER';
+
+        return {
+          ...line,
+          selectedTier: tier,
+          packagingFormat: bulk.packagingFormat,
+          unitPrice: bulk.unitPrice,
+          baseTierPrice: bulk.baseTierPrice,
+          bulkDiscountPct: bulk.bulkDiscountPct,
+          bulkSavingsRupees: bulk.bulkSavingsRupees,
+          taxableAmount,
+          cgstAmount: isIntraState ? gstTotal / 2 : 0,
+          sgstAmount: isIntraState ? gstTotal / 2 : 0,
+          igstAmount: !isIntraState ? gstTotal : 0,
+          totalAmount: taxableAmount + gstTotal
+        };
+      }
+      return line;
+    }));
   };
 
-  const handleRemoveLine = (id: string) => {
-    setLines(prev => prev.filter(l => l.id !== id));
-  };
+  // Add Product from Typeahead
+  const handleAddProductToCart = (prod: PlasticProductItem) => {
+    const tier: PricingTierKey = billingMode === 'B2B' ? (selectedCustomer.assignedTier || 'tier2_wholesale') : 'tier5_mrp';
+    const bulk = calculateBulkPricing(prod, tier, 10);
+    const taxableAmount = bulk.unitPrice * 10;
+    const gstTotal = taxableAmount * (prod.gstRate / 100);
+    const isIntraState = selectedCustomer.stateCode === activeCompany.stateCode || billingMode === 'B2C_COUNTER';
 
-  const handleResetForm = () => {
-    setLines([]);
-    setInvoiceNumber(`${activeCompany.invoicePrefix}${Math.floor(1000 + Math.random() * 9000)}`);
-  };
-
-  // Add Customer Action
-  const handleAddNewCustomer = () => {
-    if (!newCustName.trim()) return;
-
-    confetti({ particleCount: 50, spread: 60 });
-
-    const newCust: CustomerParty = {
-      id: `cust-${Date.now()}`,
-      partyName: newCustName,
-      gstin: newCustGstin || undefined,
-      stateCode: newCustStateCode,
-      phone: newCustPhone || '+91 90000 00000',
-      city: newCustCity || 'Local City',
-      partyType: newCustType,
-      assignedTier: newCustTier,
-      outstandingBalance: newCustOpeningBal,
-      balanceType: 'Dr',
-      creditLimit: 200000
+    const newLine: BilledLineItem = {
+      id: `line-${Date.now()}`,
+      product: prod,
+      selectedTier: tier,
+      packagingFormat: bulk.packagingFormat,
+      unitPrice: bulk.unitPrice,
+      baseTierPrice: bulk.baseTierPrice,
+      bulkDiscountPct: bulk.bulkDiscountPct,
+      bulkSavingsRupees: bulk.bulkSavingsRupees,
+      quantity: 10,
+      unitOfMeasure: prod.unitOfMeasure,
+      discountPct: 0,
+      taxableAmount,
+      gstRate: prod.gstRate,
+      cgstAmount: isIntraState ? gstTotal / 2 : 0,
+      sgstAmount: isIntraState ? gstTotal / 2 : 0,
+      igstAmount: !isIntraState ? gstTotal : 0,
+      totalAmount: taxableAmount + gstTotal
     };
 
-    addGlobalCustomer(newCust);
-    setSelectedCustomerId(newCust.id);
-    setShowAddCustomerModal(false);
-    setFeedbackNotice(`Customer "${newCust.partyName}" added successfully and selected for billing.`);
-    setTimeout(() => setFeedbackNotice(null), 5000);
-
-    // Reset Form
-    setNewCustName('');
-    setNewCustGstin('');
-    setNewCustPhone('');
-    setNewCustCity('');
+    setLines(prev => [newLine, ...prev]);
+    setTypeaheadQuery('');
+    setShowTypeaheadDropdown(false);
   };
 
-  // Aggregated Financials
-  const grossSubtotal = useMemo(() => lines.reduce((acc, l) => acc + (l.unitPrice * l.quantity), 0), [lines]);
-  const subtotalTaxable = useMemo(() => lines.reduce((acc, l) => acc + l.taxableAmount, 0), [lines]);
-  const totalDiscount = grossSubtotal - subtotalTaxable;
-  const totalCGST = useMemo(() => lines.reduce((acc, l) => acc + l.cgstAmount, 0), [lines]);
-  const totalSGST = useMemo(() => lines.reduce((acc, l) => acc + l.sgstAmount, 0), [lines]);
-  const totalIGST = useMemo(() => lines.reduce((acc, l) => acc + l.igstAmount, 0), [lines]);
-  const totalTax = totalCGST + totalSGST + totalIGST;
-  const rawGrandTotal = subtotalTaxable + totalTax;
-  const grandTotal = Math.round(rawGrandTotal);
-  const roundOff = grandTotal - rawGrandTotal;
-  const totalUnits = useMemo(() => lines.reduce((acc, l) => acc + l.quantity, 0), [lines]);
-
-  // Projected closing balance for Debtor
-  const projectedClosingBal = selectedCustomer.outstandingBalance + grandTotal;
-
-  const handleGenerateInvoice = () => {
+  // Save Final Invoice
+  const handleGenerateInvoice = (isPrint: boolean = false) => {
     if (lines.length === 0) return;
-
-    confetti({
-      particleCount: 80,
-      spread: 70,
-      colors: ['#FF6B00', '#10B981', '#FFFFFF']
-    });
 
     const invoiceData: FinalInvoiceData = {
       invoiceNumber,
       invoiceDate,
       company: activeCompany,
-      customer: selectedCustomer,
+      customer: billingMode === 'B2B' ? selectedCustomer : {
+        id: 'cust-08',
+        partyName: selectedCounterBuyer ? `${selectedCounterBuyer.city} ${selectedCounterBuyer.name}` : 'B2C Walk-In Counter Sales',
+        rawFirmName: selectedCounterBuyer?.name || 'Retail Counter Sales (General)',
+        city: selectedCounterBuyer?.city || 'Counter',
+        stateCode: activeCompany.stateCode,
+        phone: selectedCounterBuyer?.phone || '9999900000',
+        partyType: 'B2C_COUNTER_WALKIN',
+        assignedTier: 'tier5_mrp',
+        openingBalance: 0,
+        closingBalance: 0,
+        balanceType: 'Cr',
+        creditLimit: 0,
+        creditDays: 0
+      },
       lineItems: lines,
-      subtotalTaxable,
-      totalCGST,
-      totalSGST,
-      totalIGST,
-      roundOff,
-      grandTotal,
-      amountInWords: `INR ${grandTotal.toLocaleString('en-IN')} Rupees Only`,
+      subtotalTaxable: calculations.subtotalTaxable,
+      totalCGST: calculations.totalCGST,
+      totalSGST: calculations.totalSGST,
+      totalIGST: calculations.totalIGST,
+      roundOff: calculations.roundOff,
+      grandTotal: calculations.grandTotal,
+      amountInWords: `Rupees ${calculations.grandTotal.toLocaleString('en-IN')} Only`,
       paymentMode,
-      notes: 'Goods once sold will not be taken back. Subject to local Jurisdiction.'
+      notes: billingMode === 'B2B' ? 'Payment due as per agreed credit terms.' : 'B2C Counter Retail Cash Settlement.',
+      isCounterSale: billingMode === 'B2C_COUNTER',
+      walkInCustomerDetails: selectedCounterBuyer || undefined
     };
 
-    // Universal Cross-Module Synchronization
+    // Fast order bill records to accounting, updates stock, updates customer ledger
     addFastOrderBill(invoiceData);
-    setCurrentInvoice(invoiceData);
-    onPostToLedger(invoiceData);
-    onViewInvoice(invoiceData);
+    confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
+
+    if (isPrint) {
+      window.print();
+    } else {
+      onViewInvoice(invoiceData);
+    }
+  };
+
+  // Quick Add B2C Customer
+  const handleSaveCounterBuyer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCounterName || !newCounterPhone) return;
+
+    const created = addCounterCustomer({
+      name: newCounterName,
+      phone: newCounterPhone,
+      city: newCounterCity
+    });
+
+    setSelectedCounterBuyer({
+      name: created.name,
+      phone: created.phone,
+      city: created.city
+    });
+    setCounterSearchQuery(`${created.name} (+91 ${created.phone})`);
+    setShowAddCounterModal(false);
+    setNewCounterName('');
+    setNewCounterPhone('');
+  };
+
+  // Handle B2B Location-First Customer Creation
+  const handleSaveB2BCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustRawName || !newCustCity) return;
+
+    const formattedPartyName = `${newCustCity} ${newCustRawName}`;
+
+    const newCust: CustomerParty = {
+      id: `cust-${Date.now()}`,
+      partyName: formattedPartyName, // Location-First format
+      rawFirmName: newCustRawName,
+      city: newCustCity,
+      stateCode: newCustStateCode,
+      gstin: newCustGstin,
+      phone: newCustPhone,
+      partyType: 'B2B_WHOLESALER',
+      assignedTier: newCustTier,
+      openingBalance: newCustOpeningBal,
+      closingBalance: newCustOpeningBal,
+      balanceType: 'Dr',
+      creditLimit: newCustCreditLimit,
+      creditDays: 30
+    };
+
+    addGlobalCustomer(newCust);
+    setSelectedCustomerId(newCust.id);
+    setShowAddCustomerModal(false);
+    setNewCustRawName('');
+    setNewCustGstin('');
+    setNewCustPhone('');
+  };
+
+  // Handle Sales Return (Damaged/Broken Customer Return)
+  const handleSaveSalesReturn = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cust = customers.find(c => c.id === srCustomerId) || customers[0];
+    if (!cust || srLines.length === 0) return;
+
+    let grandTotal = 0;
+    const lineItems: SalesReturnItem[] = srLines.map((line, idx) => {
+      const total = line.damagedQuantity * line.unitPrice * (1 + line.gstRate / 100);
+      grandTotal += total;
+      return {
+        id: `sri-${Date.now()}-${idx}`,
+        productId: line.productId,
+        productSku: line.productSku,
+        productName: line.productName,
+        damagedQuantity: line.damagedQuantity,
+        unitPrice: line.unitPrice,
+        gstRate: line.gstRate,
+        totalAmount: total,
+        damageType: srDamageType,
+        notes: srNotes
+      };
+    });
+
+    const srPayload: SalesReturn = {
+      id: `sr-${Date.now()}`,
+      creditNoteNumber: `CN-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceRefNumber: srInvoiceRef,
+      customerId: cust.id,
+      customerName: cust.partyName,
+      returnDate: getTodayISODate(),
+      lineItems,
+      grandTotal,
+      status: 'POSTED',
+      refundMode: 'CREDIT_TO_LEDGER',
+      notes: srNotes
+    };
+
+    createSalesReturn(srPayload);
+    setShowSalesReturnModal(false);
+    confetti({ particleCount: 45, spread: 60 });
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: 'calc(100vh - var(--header-height) - 36px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* 2-Column Split Workspace */}
+      {/* Top Header Card */}
       <div 
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 380px',
-          gap: '18px',
-          height: '100%',
-          minHeight: 0
+          background: 'var(--bg-secondary)',
+          borderRadius: '12px',
+          padding: '22px 24px',
+          border: '1px solid var(--border-subtle)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px'
         }}
       >
-        
-        {/* ========================================================================= */}
-        {/* LEFT COLUMN: PRODUCT SEARCH, ADDING & LINE ITEMS LISTING                   */}
-        {/* ========================================================================= */}
-        <div 
-          className="glass-panel"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            overflow: 'hidden',
-            padding: '16px',
-            gap: '14px'
-          }}
-        >
-          {/* Header Row: Debtor Selection & Invoice Particulars */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr', gap: '12px' }}>
-            {/* Customer Selector */}
-            <div style={{ background: 'var(--bg-primary)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  CUSTOMER / DEBTOR
-                </span>
-                <button 
-                  onClick={() => setShowAddCustomerModal(true)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-orange-bright)', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  + New Customer
-                </button>
-              </div>
-              <select 
-                value={selectedCustomerId}
-                onChange={e => setSelectedCustomerId(e.target.value)}
-                className="form-input"
-                style={{ fontWeight: 700, padding: '4px 8px', fontSize: '12.5px' }}
-              >
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.partyName} ({c.city}) — Tier {c.assignedTier.replace('tier', 'T')}
-                  </option>
-                ))}
-              </select>
-              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                <span>GSTIN: <strong style={{ color: '#FFF' }}>{selectedCustomer.gstin || 'Unregistered'}</strong></span>
-                <span>Balance: <strong style={{ color: '#EF4444' }}>₹{selectedCustomer.outstandingBalance.toLocaleString('en-IN')} {selectedCustomer.balanceType}</strong></span>
-              </div>
-            </div>
-
-            {/* Invoice Number */}
-            <div style={{ background: 'var(--bg-primary)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '3px' }}>
-                INVOICE NUMBER
-              </div>
-              <input 
-                type="text" 
-                value={invoiceNumber}
-                onChange={e => setInvoiceNumber(e.target.value)}
-                className="form-input font-mono"
-                style={{ fontWeight: 800, fontSize: '13px', padding: '4px 8px', color: 'var(--accent-orange-bright)' }}
-              />
-              <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                Auto-assigned sequence
-              </div>
-            </div>
-
-            {/* Invoice Date */}
-            <div style={{ background: 'var(--bg-primary)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '3px' }}>
-                INVOICE DATE
-              </div>
-              <input 
-                type="date" 
-                value={invoiceDate}
-                onChange={e => setInvoiceDate(e.target.value)}
-                className="form-input"
-                style={{ fontWeight: 600, fontSize: '12px', padding: '4px 8px' }}
-              />
-              <div style={{ fontSize: '10.5px', color: 'var(--accent-orange-bright)', marginTop: '4px', fontWeight: 600 }}>
-                {formatDate(invoiceDate)}
-              </div>
-            </div>
-          </div>
-
-          {/* Product Type-Ahead Search Input */}
-          <div style={{ position: 'relative' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <div 
               style={{
-                background: 'var(--bg-primary)',
-                border: '1.5px solid var(--accent-orange)',
+                width: '36px',
+                height: '36px',
                 borderRadius: '8px',
-                padding: '9px 14px',
+                background: 'rgba(255, 107, 0, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                boxShadow: '0 0 16px rgba(255, 107, 0, 0.15)'
+                justifyContent: 'center',
+                color: 'var(--accent-orange)'
               }}
             >
-              <Search size={16} color="var(--accent-orange-bright)" />
-              <input 
+              <Receipt size={20} />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Fast Billing & Invoicing Terminal
+            </h1>
+            <span 
+              style={{
+                background: billingMode === 'B2B' ? 'rgba(2, 132, 199, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                color: billingMode === 'B2B' ? '#38BDF8' : '#10B981',
+                padding: '3px 10px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: 800,
+                border: `1px solid ${billingMode === 'B2B' ? 'rgba(2, 132, 199, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
+              }}
+            >
+              {billingMode === 'B2B' ? '🏢 B2B WHOLESALE & LOCATION-FIRST' : '🛒 B2C COUNTER CASH RETAIL'}
+            </span>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+            Autocomplete product search, automatic volume/bulk quantity discounts (Packets, Sets, Crates), multi-tier pricing, and live ledger synchronization.
+          </p>
+        </div>
+
+        {/* Mode Switcher & Quick Sales Return */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          
+          {/* Mode Toggle */}
+          <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+            <button
+              onClick={() => setBillingMode('B2B')}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: billingMode === 'B2B' ? 'var(--accent-orange)' : 'transparent',
+                color: billingMode === 'B2B' ? '#FFF' : 'var(--text-secondary)'
+              }}
+            >
+              🏢 B2B Invoicing
+            </button>
+            <button
+              onClick={() => setBillingMode('B2C_COUNTER')}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: billingMode === 'B2C_COUNTER' ? 'var(--accent-orange)' : 'transparent',
+                color: billingMode === 'B2C_COUNTER' ? '#FFF' : 'var(--text-secondary)'
+              }}
+            >
+              🛒 B2C Counter Sales
+            </button>
+          </div>
+
+          <button
+            onClick={() => setShowSalesReturnModal(true)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#EF4444',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <RotateCcw size={16} /> Sales Return (Broken Goods)
+          </button>
+        </div>
+      </div>
+
+      {/* Main Billing Canvas Grid */}
+      <div className="responsive-billing-grid">
+        
+        {/* Left Column: Customer Details, Product Search & Line Items */}
+        <div className="billing-left-col">
+          
+          {/* Customer / Buyer Selection Card */}
+          <div style={{ background: 'var(--bg-secondary)', padding: '18px 20px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+            
+            {billingMode === 'B2B' ? (
+              // B2B Customer Selector (Location-First format)
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Building2 size={16} color="var(--accent-orange)" />
+                    B2B Client Account (Location-First) *
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomerModal(true)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--accent-orange)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <UserPlus size={14} /> + Add B2B Client
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', alignItems: 'center' }}>
+                  <select
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 600
+                    }}
+                  >
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.partyName} (City: {c.city}) — Bal: ₹{c.closingBalance.toLocaleString('en-IN')} (Dr)
+                      </option>
+                    ))}
+                  </select>
+
+                  <div 
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      textAlign: 'right',
+                      border: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Current Outstanding Bal</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#38BDF8', fontFamily: 'var(--font-mono)' }}>
+                      ₹{selectedCustomer.closingBalance.toLocaleString('en-IN')} (Dr)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // B2C Walk-In Counter Customer Selector (Phone / Name Search with 1-Click Quick Add)
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={16} color="#10B981" />
+                    B2C Walk-in Buyer Search (Mobile / Name) *
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCounterModal(true)}
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.35)',
+                      color: '#10B981',
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={14} /> + Create New Walk-in Customer
+                  </button>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search by Mobile # (e.g. 98234) or Customer Name..."
+                    value={counterSearchQuery}
+                    onFocus={() => setShowCounterBuyerDropdown(true)}
+                    onChange={(e) => {
+                      setCounterSearchQuery(e.target.value);
+                      setShowCounterBuyerDropdown(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  />
+
+                  {showCounterBuyerDropdown && filteredCounterBuyers.length > 0 && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-medium)',
+                        boxShadow: 'var(--shadow-lg)',
+                        zIndex: 100,
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        marginTop: '4px'
+                      }}
+                    >
+                      {filteredCounterBuyers.map(buyer => (
+                        <div
+                          key={buyer.id}
+                          onClick={() => {
+                            setSelectedCounterBuyer({ name: buyer.name, phone: buyer.phone, city: buyer.city });
+                            setCounterSearchQuery(`${buyer.name} (+91 ${buyer.phone}) - ${buyer.city}`);
+                            setShowCounterBuyerDropdown(false);
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid var(--border-subtle)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13px' }}>{buyer.name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>📱 +91 {buyer.phone} • City: {buyer.city}</div>
+                          </div>
+                          <span style={{ fontSize: '11px', color: '#10B981', fontWeight: 600 }}>
+                            {buyer.totalPurchasesCount} Visits | ₹{buyer.totalSpent.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* Type-Ahead Product Search */}
+          <div style={{ background: 'var(--bg-secondary)', padding: '18px 20px', borderRadius: '10px', border: '1px solid var(--border-subtle)', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Search size={16} color="var(--accent-orange)" />
+                Quick Type-Ahead Product Search
+              </label>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                Press enter or click to add product line item
+              </span>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <input
                 type="text"
-                placeholder="Scan Barcode or Type SKU / Product Name to add line items..."
+                placeholder="Type plastic product SKU (e.g. DMK-CHR-ROYAL) or keyword (chair, bucket, stool)..."
                 value={typeaheadQuery}
-                onChange={e => {
+                onFocus={() => setShowTypeaheadDropdown(true)}
+                onChange={(e) => {
                   setTypeaheadQuery(e.target.value);
                   setShowTypeaheadDropdown(true);
                 }}
-                onFocus={() => setShowTypeaheadDropdown(true)}
                 style={{
-                  flex: 1,
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#FFF',
-                  fontSize: '13px',
-                  fontWeight: 600
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-primary)',
+                  fontSize: '14px'
                 }}
               />
-              {typeaheadQuery && (
-                <button 
-                  onClick={() => setTypeaheadQuery('')}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px' }}
+
+              {showTypeaheadDropdown && typeaheadQuery.length > 0 && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'var(--bg-tertiary)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-medium)',
+                    boxShadow: 'var(--shadow-lg)',
+                    zIndex: 100,
+                    maxHeight: '260px',
+                    overflowY: 'auto',
+                    marginTop: '6px'
+                  }}
                 >
-                  ✕
-                </button>
+                  {catalog
+                    .filter(p => 
+                      p.name.toLowerCase().includes(typeaheadQuery.toLowerCase()) || 
+                      p.sku.toLowerCase().includes(typeaheadQuery.toLowerCase()) ||
+                      p.category.toLowerCase().includes(typeaheadQuery.toLowerCase())
+                    )
+                    .map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => handleAddProductToCart(p)}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid var(--border-subtle)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '13px' }}>
+                            {p.name}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                            {p.sku} | {p.category} | Sourced: {p.manufacturerName || 'Direct'}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '14px', fontWeight: 800, color: '#10B981', fontFamily: 'var(--font-mono)' }}>
+                            ₹{p.pricing.tier2_wholesale.toFixed(2)} (Wholesale)
+                          </div>
+                          <div style={{ fontSize: '11px', color: p.stockQuantity <= p.lowStockThreshold ? '#F59E0B' : 'var(--text-secondary)' }}>
+                            Stock: {p.stockQuantity} {p.unitOfMeasure}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cart Billed Line Items Table */}
+          <div style={{ background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Billed Items in Cart ({lines.length})
+              </h3>
+              {calculations.totalBulkSavings > 0 && (
+                <span 
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10B981',
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700
+                  }}
+                >
+                  🎉 Bulk Volume Savings Applied: ₹{calculations.totalBulkSavings.toFixed(2)}
+                </span>
               )}
             </div>
 
-            {/* Dropdown Menu */}
-            {showTypeaheadDropdown && matchingProducts.length > 0 && (
-              <div 
-                className="glass-panel"
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  zIndex: 50,
-                  marginTop: '6px',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  padding: '6px',
-                  boxShadow: '0 16px 36px rgba(0, 0, 0, 0.8)'
-                }}
-              >
-                {matchingProducts.map((prod, idx) => {
-                  const custTier = selectedCustomer ? selectedCustomer.assignedTier : 'tier2_wholesale';
-                  const tierPrice = prod.pricing[custTier];
-                  return (
-                    <div 
-                      key={prod.id}
-                      onClick={() => handleSelectProduct(prod)}
-                      style={{
-                        padding: '9px 14px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        backgroundColor: highlightedIndex === idx ? 'rgba(255, 107, 0, 0.15)' : 'transparent',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#FFF', fontSize: '12.5px' }}>{prod.name}</div>
-                        <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
-                          SKU: {prod.sku} • HSN: {prod.hsnCode} • Available: {prod.stockQuantity} {prod.unitOfMeasure}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="font-mono" style={{ fontWeight: 800, color: 'var(--accent-orange-bright)', fontSize: '13px' }}>
-                          ₹{tierPrice} / {prod.unitOfMeasure}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
-                          Tier {custTier.replace('tier', 'T')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Quick-Add Popular SKU Chips */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 700, whiteSpace: 'nowrap' }}>
-              Quick Add:
-            </span>
-            {catalog.slice(0, 5).map(p => (
-              <button
-                key={p.id}
-                onClick={() => handleSelectProduct(p)}
-                style={{
-                  padding: '3px 8px',
-                  borderRadius: '6px',
-                  fontSize: '10.5px',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                  border: '1px solid var(--border-subtle)',
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title={`Click to add ${p.name}`}
-              >
-                <Plus size={11} color="var(--accent-orange)" />
-                <span>{p.sku}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Line Items Table Container */}
-          <div 
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: '8px',
-              background: 'var(--bg-primary)'
-            }}
-          >
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-subtle)' }}>
-                <tr>
-                  <th style={{ padding: '10px 12px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800 }}>ITEM / SPECIFICATION</th>
-                  <th style={{ padding: '10px 8px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '120px' }}>TIER</th>
-                  <th style={{ padding: '10px 8px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '85px', textAlign: 'right' }}>RATE (₹)</th>
-                  <th style={{ padding: '10px 8px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '95px', textAlign: 'center' }}>QTY</th>
-                  <th style={{ padding: '10px 8px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '65px', textAlign: 'right' }}>DISC%</th>
-                  <th style={{ padding: '10px 8px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '95px', textAlign: 'right' }}>TAXABLE</th>
-                  <th style={{ padding: '10px 10px', fontSize: '10.5px', color: 'var(--text-secondary)', fontWeight: 800, width: '100px', textAlign: 'right' }}>TOTAL (₹)</th>
-                  <th style={{ padding: '10px 6px', width: '36px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-tertiary)' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <ShoppingBag size={28} color="var(--accent-orange)" />
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFF' }}>No items in bill</div>
-                        <div style={{ fontSize: '11px' }}>Search by SKU or click quick-add chips above to add products.</div>
-                      </div>
-                    </td>
+            <div className="cart-table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+              <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border-medium)' }}>
+                    <th style={{ width: '30%', minWidth: '240px', padding: '10px 12px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Product</th>
+                    <th style={{ width: '17%', minWidth: '130px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Price Tier</th>
+                    <th style={{ width: '13%', minWidth: '105px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>Quantity</th>
+                    <th style={{ width: '10%', minWidth: '75px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Unit Rate</th>
+                    <th style={{ width: '10%', minWidth: '75px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Taxable</th>
+                    <th style={{ width: '9%', minWidth: '65px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>GST</th>
+                    <th style={{ width: '11%', minWidth: '85px', padding: '10px 10px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Total</th>
+                    <th style={{ width: '36px', minWidth: '36px', padding: '10px 6px', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', textAlign: 'center' }}></th>
                   </tr>
-                ) : (
-                  lines.map((line, idx) => (
-                    <tr key={line.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', background: idx % 2 === 1 ? 'rgba(255, 255, 255, 0.015)' : 'transparent' }}>
-                      {/* Item description */}
-                      <td style={{ padding: '10px 12px' }}>
-                        <div style={{ fontWeight: 700, color: '#FFF', fontSize: '12px' }}>{line.product.name}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                          SKU: <span className="font-mono">{line.product.sku}</span> • HSN: {line.product.hsnCode || '39241090'}
+                </thead>
+                <tbody>
+                  {lines.map((line) => (
+                    <tr key={line.id} style={{ borderBottom: '1px solid var(--border-subtle)', transition: 'background 0.15s ease' }}>
+                      
+                      {/* Product Name & Info (3 Clean Vertical Rows: Title 2-lines, SKU | HSN 1-line, Discount Pill 1-line) */}
+                      <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                        {/* 1. Product Name (Up to 2 lines max) */}
+                        <div 
+                          title={line.product.name}
+                          style={{ 
+                            fontWeight: 700, 
+                            color: 'var(--text-primary)', 
+                            fontSize: '13px', 
+                            lineHeight: 1.35,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word',
+                            marginBottom: '3px'
+                          }}
+                        >
+                          {line.product.name}
                         </div>
+
+                        {/* 2. SKU and HSN code side by side with | on ONE line */}
+                        <div 
+                          style={{ 
+                            fontSize: '11px', 
+                            color: 'var(--text-tertiary)', 
+                            whiteSpace: 'nowrap', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px',
+                            marginBottom: (line.bulkDiscountPct || 0) > 0 ? '4px' : '0'
+                          }}
+                        >
+                          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', fontWeight: 600 }}>{line.product.sku}</span>
+                          <span style={{ color: 'var(--border-medium)', fontWeight: 300 }}>|</span>
+                          <span>HSN: {line.product.hsnCode}</span>
+                        </div>
+                        
+                        {/* 3. Bulk volume discount tag on ONE line */}
+                        {(line.bulkDiscountPct || 0) > 0 && (
+                          <div 
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              background: 'rgba(255, 107, 0, 0.15)',
+                              color: 'var(--accent-orange)',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              whiteSpace: 'nowrap',
+                              border: '1px solid rgba(255, 107, 0, 0.3)',
+                              width: 'fit-content'
+                            }}
+                          >
+                            <Sparkles size={10} />
+                            <span>{(line.packagingFormat || 'BULK').replace('_', ' ')} (-{line.bulkDiscountPct}%) • Saved ₹{(line.bulkSavingsRupees || 0).toFixed(0)}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Tier Selector */}
-                      <td style={{ padding: '10px 8px' }}>
-                        <select 
+                      <td style={{ padding: '10px', verticalAlign: 'middle' }}>
+                        <select
                           value={line.selectedTier}
-                          onChange={e => handleUpdateLine(line.id, { selectedTier: e.target.value as PricingTierKey })}
-                          className="form-input"
-                          style={{ padding: '3px 6px', fontSize: '10.5px' }}
+                          onChange={(e) => handleTierChange(line.id, e.target.value as PricingTierKey)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 6px',
+                            borderRadius: '5px',
+                            background: 'var(--bg-tertiary)',
+                            border: '1px solid var(--border-medium)',
+                            color: 'var(--text-primary)',
+                            fontSize: '11px',
+                            fontWeight: 600
+                          }}
                         >
-                          <option value="tier1_distributor">T1 Distributor</option>
-                          <option value="tier2_wholesale">T2 Wholesale</option>
-                          <option value="tier3_semi_wholesale">T3 Semi-Whl</option>
-                          <option value="tier4_retailer">T4 Retailer</option>
-                          <option value="tier5_mrp">T5 MRP</option>
+                          <option value="tier1_distributor">Distributor (₹{line.product.pricing.tier1_distributor})</option>
+                          <option value="tier2_wholesale">Wholesale (₹{line.product.pricing.tier2_wholesale})</option>
+                          <option value="tier3_semi_wholesale">Semi-Wholesale (₹{line.product.pricing.tier3_semi_wholesale})</option>
+                          <option value="tier4_retailer">Retailer (₹{line.product.pricing.tier4_retailer})</option>
+                          <option value="tier5_mrp">MRP (₹{line.product.pricing.tier5_mrp})</option>
                         </select>
                       </td>
 
-                      {/* Rate */}
-                      <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                        <input 
-                          type="number"
-                          value={line.unitPrice}
-                          onChange={e => handleUpdateLine(line.id, { unitPrice: parseFloat(e.target.value) || 0 })}
-                          className="form-input font-mono"
-                          style={{ width: '75px', textAlign: 'right', padding: '3px 6px', fontSize: '11.5px' }}
-                        />
-                      </td>
-
-                      {/* Qty with +/- buttons */}
-                      <td style={{ padding: '10px 8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                          <button 
-                            onClick={() => handleAdjustQty(line.id, -5)}
-                            style={{ width: '20px', height: '22px', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', color: '#FFF', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Decrease 5"
+                      {/* Quantity Stepper */}
+                      <td style={{ padding: '10px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: 'var(--bg-tertiary)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-medium)' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(line.id, line.quantity - 1)}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              background: 'var(--bg-secondary)',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '13px'
+                            }}
                           >
                             -
                           </button>
-                          <input 
+                          <input
                             type="number"
+                            min="1"
                             value={line.quantity}
-                            onChange={e => handleUpdateLine(line.id, { quantity: parseInt(e.target.value) || 1 })}
-                            className="form-input font-mono"
-                            style={{ width: '48px', textAlign: 'center', padding: '3px 2px', fontSize: '11.5px', fontWeight: 700 }}
+                            onChange={(e) => handleQuantityChange(line.id, parseInt(e.target.value) || 1)}
+                            style={{
+                              width: '42px',
+                              height: '24px',
+                              padding: '0 2px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#FFFFFF',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              textAlign: 'center',
+                              fontFamily: 'var(--font-mono)'
+                            }}
                           />
-                          <button 
-                            onClick={() => handleAdjustQty(line.id, 5)}
-                            style={{ width: '20px', height: '22px', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', color: '#FFF', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="Increase 5"
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(line.id, line.quantity + 1)}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '4px',
+                              background: 'var(--bg-secondary)',
+                              border: 'none',
+                              color: 'var(--text-primary)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '13px'
+                            }}
                           >
                             +
                           </button>
                         </div>
                       </td>
 
-                      {/* Discount % */}
-                      <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                        <input 
-                          type="number"
-                          value={line.discountPct}
-                          onChange={e => handleUpdateLine(line.id, { discountPct: parseFloat(e.target.value) || 0 })}
-                          className="form-input font-mono"
-                          style={{ width: '50px', textAlign: 'right', padding: '3px 4px', fontSize: '11.5px' }}
-                        />
+                      {/* Bulk Unit Rate */}
+                      <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '12.5px', fontWeight: 700, color: '#38BDF8', textAlign: 'right', verticalAlign: 'middle' }}>
+                        ₹{line.unitPrice.toFixed(2)}
                       </td>
 
                       {/* Taxable */}
-                      <td className="font-mono" style={{ padding: '10px 8px', textAlign: 'right', fontWeight: 600, fontSize: '11.5px' }}>
-                        ₹{line.taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'right', verticalAlign: 'middle' }}>
+                        ₹{line.taxableAmount.toFixed(2)}
+                      </td>
+
+                      {/* GST */}
+                      <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'right', verticalAlign: 'middle' }}>
+                        ₹{(line.cgstAmount + line.sgstAmount + line.igstAmount).toFixed(2)}
+                        <div style={{ fontSize: '9px', color: 'var(--text-disabled)' }}>({line.gstRate}%)</div>
                       </td>
 
                       {/* Total */}
-                      <td className="font-mono" style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 800, color: 'var(--accent-orange-bright)', fontSize: '12.5px' }}>
-                        ₹{line.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 800, color: '#10B981', textAlign: 'right', verticalAlign: 'middle' }}>
+                        ₹{line.totalAmount.toFixed(2)}
                       </td>
 
-                      {/* Trash */}
-                      <td style={{ padding: '10px 6px', textAlign: 'center' }}>
-                        <button 
-                          onClick={() => handleRemoveLine(line.id)}
-                          className="btn-icon"
-                          style={{ color: 'var(--accent-red)', padding: '4px' }}
-                          title="Remove Line"
+                      {/* Delete */}
+                      <td style={{ padding: '10px', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <button
+                          type="button"
+                          onClick={() => setLines(prev => prev.filter(l => l.id !== line.id))}
+                          title="Remove Item"
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            borderRadius: '5px',
+                            color: '#EF4444',
+                            cursor: 'pointer',
+                            padding: '5px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
                         >
                           <Trash2 size={13} />
                         </button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+
         </div>
 
-        {/* ========================================================================= */}
-        {/* RIGHT COLUMN: FINANCIAL TOTALS & SETTLEMENT SIDEBAR                       */}
-        {/* ========================================================================= */}
-        <div 
-          className="glass-panel"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            overflowY: 'auto',
-            padding: '16px',
-            gap: '14px'
-          }}
-        >
-          {/* Section Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFF' }}>
-              Financial & Settlement
-            </div>
-            <span className={isIntraState ? 'status-pill status-pill-success' : 'status-pill-orange'} style={{ fontSize: '9px', padding: '2px 6px' }}>
-              {isIntraState ? 'CGST + SGST (9%+9%)' : 'IGST (18%)'}
-            </span>
-          </div>
-
-          {/* Payment Terms Selector */}
-          <div style={{ background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-            <label className="form-label" style={{ fontSize: '10px', marginBottom: '4px' }}>PAYMENT TERMS & MODE</label>
-            <select 
-              value={paymentMode}
-              onChange={e => setPaymentMode(e.target.value as any)}
-              className="form-input"
-              style={{ fontWeight: 700, fontSize: '12px' }}
-            >
-              <option value="CREDIT_30_DAYS">Credit (30 Days)</option>
-              <option value="NEFT_RTGS">Bank NEFT / RTGS</option>
-              <option value="UPI">Instant UPI</option>
-              <option value="CASH">Cash Sale</option>
-            </select>
-          </div>
-
-          {/* Order Metrics Strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            <div style={{ background: 'var(--bg-primary)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Items</div>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFF', marginTop: '1px' }}>
-                {lines.length} SKUs ({totalUnits} Pcs)
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-primary)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Tax</div>
-              <div className="font-mono" style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent-cyan)', marginTop: '1px' }}>
-                ₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-            </div>
-          </div>
-
-          {/* Breakdown Numerical Rows */}
-          <div style={{ background: 'var(--bg-primary)', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-              <span>Gross Total:</span>
-              <span className="font-mono" style={{ color: '#FFF' }}>₹{grossSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-
-            {totalDiscount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#10B981' }}>
-                <span>Trade Discounts:</span>
-                <span className="font-mono">-₹{totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--text-secondary)' }}>
-              <span>Taxable Base:</span>
-              <span className="font-mono" style={{ color: '#FFF', fontWeight: 700 }}>₹{subtotalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-
-            {isIntraState ? (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                  <span>Output CGST (9%):</span>
-                  <span className="font-mono" style={{ color: 'var(--accent-cyan)' }}>₹{totalCGST.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                  <span>Output SGST (9%):</span>
-                  <span className="font-mono" style={{ color: 'var(--accent-cyan)' }}>₹{totalSGST.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                <span>Output IGST (18%):</span>
-                <span className="font-mono" style={{ color: 'var(--accent-cyan)' }}>₹{totalIGST.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-              <span>Round Off:</span>
-              <span className="font-mono" style={{ color: '#FFF' }}>{roundOff >= 0 ? `+₹${roundOff.toFixed(2)}` : `-₹${Math.abs(roundOff).toFixed(2)}`}</span>
-            </div>
-          </div>
-
-          {/* Grand Total Prominent Highlight Card */}
+        {/* Right Column: Checkout & Summary Card */}
+        <div className="billing-right-col">
+          
+          {/* Invoice Summary Box */}
           <div 
             style={{
-              background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(16, 185, 129, 0.1) 100%)',
-              border: '1.5px solid var(--accent-orange)',
-              borderRadius: '8px',
-              padding: '12px 14px',
+              background: 'var(--bg-secondary)',
+              borderRadius: '12px',
+              padding: '20px',
+              border: '1px solid var(--border-subtle)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px'
+              gap: '14px'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: '#FFF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                INVOICE GRAND TOTAL:
-              </span>
-              <span className="font-mono" style={{ fontSize: '20px', fontWeight: 900, color: 'var(--accent-orange-bright)' }}>
-                ₹{grandTotal.toLocaleString('en-IN')}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Invoice Overview</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: 'var(--accent-orange)' }}>
+                {invoiceNumber}
               </span>
             </div>
-            <div style={{ fontSize: '9.5px', color: 'var(--text-secondary)' }}>
-              INR {grandTotal.toLocaleString('en-IN')} Rupees Only
+
+            {/* Date & Payment Mode */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Invoice Date
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                  Settlement & Payment Mode
+                </label>
+                <select
+                  value={paymentMode}
+                  onChange={(e: any) => setPaymentMode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 700
+                  }}
+                >
+                  <option value="CREDIT_30_DAYS">30 Days Credit (Ledger Debit)</option>
+                  <option value="CASH">Counter Cash</option>
+                  <option value="UPI">Corporate UPI / QR</option>
+                  <option value="NEFT_RTGS">Bank NEFT / RTGS</option>
+                </select>
+              </div>
             </div>
+
+            {/* Breakdown */}
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <span>Taxable Amount</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>₹{calculations.subtotalTaxable.toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <span>Output CGST</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>₹{calculations.totalCGST.toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <span>Output SGST</span>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>₹{calculations.totalSGST.toFixed(2)}</span>
+              </div>
+
+              {calculations.totalIGST > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <span>Output IGST</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>₹{calculations.totalIGST.toFixed(2)}</span>
+                </div>
+              )}
+
+              {calculations.roundOff !== 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                  <span>Round Off</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>₹{calculations.roundOff.toFixed(2)}</span>
+                </div>
+              )}
+
+              <div 
+                style={{
+                  borderTop: '1px solid var(--border-medium)',
+                  paddingTop: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-primary)' }}>Grand Total</span>
+                <span style={{ fontSize: '22px', fontWeight: 900, color: '#10B981', fontFamily: 'var(--font-mono)' }}>
+                  ₹{calculations.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => handleGenerateInvoice(false)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #FF6B00 0%, #FF851B 100%)',
+                  border: 'none',
+                  color: '#FFF',
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px rgba(255, 107, 0, 0.35)'
+                }}
+              >
+                <CheckCircle2 size={18} />
+                Generate & Post Invoice
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleGenerateInvoice(true)}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-primary)',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Printer size={16} />
+                Generate & Print Tax Bill
+              </button>
+            </div>
+
           </div>
 
-          {/* Customer Ledger Projection */}
-          <div style={{ background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '10.5px', color: 'var(--text-tertiary)' }}>
-            <div style={{ fontWeight: 700, color: '#FFF', marginBottom: '2px' }}>Debtor Ledger Projection</div>
-            <div>Current Bal: <span style={{ color: '#EF4444' }}>₹{selectedCustomer.outstandingBalance.toLocaleString('en-IN')} Dr</span></div>
-            <div>Post-Bill Bal: <strong style={{ color: 'var(--accent-cyan)' }}>₹{projectedClosingBal.toLocaleString('en-IN')} Dr</strong></div>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto' }}>
-            <button 
-              onClick={handleGenerateInvoice}
-              className="btn-primary"
-              disabled={lines.length === 0}
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 0 20px rgba(255, 107, 0, 0.4)'
-              }}
-            >
-              <FileCheck size={16} />
-              <span>Generate & Issue Tax Invoice →</span>
-            </button>
-
-            <button 
-              onClick={handleResetForm}
-              className="btn-secondary"
-              style={{ width: '100%', padding: '8px', fontSize: '11px' }}
-            >
-              <RotateCcw size={12} />
-              <span>Clear / Reset Bill</span>
-            </button>
-          </div>
         </div>
 
       </div>
 
-      {/* Add Customer Modal */}
+      {/* ==================================================================== */}
+      {/* MODAL: QUICK ADD B2C WALK-IN CUSTOMER                                */}
+      {/* ==================================================================== */}
+      {showAddCounterModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--bg-secondary)',
+              width: '100%',
+              maxWidth: '480px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-medium)',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Register New Walk-in Counter Buyer
+              </h3>
+              <button onClick={() => setShowAddCounterModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCounterBuyer} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Pawar"
+                  value={newCounterName}
+                  onChange={(e) => setNewCounterName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Mobile Phone Number *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 9823411223"
+                  value={newCounterPhone}
+                  onChange={(e) => setNewCounterPhone(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  City / Locality
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Latur, Solapur"
+                  value={newCounterCity}
+                  onChange={(e) => setNewCounterCity(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCounterModal(false)}
+                  style={{ padding: '8px 14px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', borderRadius: '6px', background: 'var(--accent-orange)', border: 'none', color: '#FFF', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Save Buyer & Auto-Select
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* MODAL: ADD NEW B2B CLIENT (LOCATION-FIRST)                           */}
+      {/* ==================================================================== */}
       {showAddCustomerModal && (
         <div 
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            background: 'rgba(0, 0, 0, 0.75)',
             backdropFilter: 'blur(6px)',
+            zIndex: 9999,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 9999,
             padding: '20px'
           }}
         >
           <div 
-            className="glass-panel"
             style={{
+              background: 'var(--bg-secondary)',
               width: '100%',
-              maxWidth: '520px',
-              padding: '24px',
+              maxWidth: '560px',
               borderRadius: '12px',
-              border: '1px solid var(--accent-orange-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px'
+              border: '1px solid var(--border-medium)',
+              padding: '24px'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255, 107, 0, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-orange-bright)' }}>
-                  <UserPlus size={18} />
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFF' }}>
-                  Add New Debtor / Customer
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Add B2B Client (Location-First Naming)
+                </h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  Formatted automatically as [City] [Firm Name] (e.g. Latur Ishwar Mule)
+                </span>
               </div>
-              <button onClick={() => setShowAddCustomerModal(false)} className="btn-icon" style={{ color: 'var(--text-secondary)' }}>
+              <button onClick={() => setShowAddCustomerModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label className="form-label">CUSTOMER / TRADING ENTITY NAME *</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Sri Balaji Crockery Mart"
-                  value={newCustName}
-                  onChange={e => setNewCustName(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
+            <form onSubmit={handleSaveB2BCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
                 <div>
-                  <label className="form-label">GSTIN (15-DIGIT)</label>
-                  <input 
-                    type="text" 
-                    placeholder="33AAAAA0000A1Z5"
-                    value={newCustGstin}
-                    onChange={e => setNewCustGstin(e.target.value.toUpperCase())}
-                    className="form-input font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">STATE CODE</label>
-                  <input 
-                    type="text" 
-                    value={newCustStateCode}
-                    onChange={e => setNewCustStateCode(e.target.value)}
-                    className="form-input font-mono"
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label className="form-label">CITY / LOCATION</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Coimbatore"
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    City / Location *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Latur"
                     value={newCustCity}
-                    onChange={e => setNewCustCity(e.target.value)}
-                    className="form-input"
+                    onChange={(e) => setNewCustCity(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
                   />
                 </div>
+
                 <div>
-                  <label className="form-label">PHONE NUMBER</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. +91 98400 11223"
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Firm / Client Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ishwar Mule"
+                    value={newCustRawName}
+                    onChange={(e) => setNewCustRawName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Live Preview of formatted name */}
+              {newCustRawName && newCustCity && (
+                <div style={{ background: 'rgba(2, 132, 199, 0.1)', padding: '8px 12px', borderRadius: '6px', border: '1px solid rgba(2, 132, 199, 0.3)', fontSize: '12px', color: '#38BDF8' }}>
+                  🏷️ Display Name: <strong>{newCustCity} {newCustRawName}</strong>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    GSTIN
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="27AAAP..."
+                    value={newCustGstin}
+                    onChange={(e) => setNewCustGstin(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+91 98000 00000"
                     value={newCustPhone}
-                    onChange={e => setNewCustPhone(e.target.value)}
-                    className="form-input"
+                    onChange={(e) => setNewCustPhone(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label className="form-label">PARTY CLASSIFICATION</label>
-                  <select 
-                    value={newCustType}
-                    onChange={e => setNewCustType(e.target.value as any)}
-                    className="form-input"
-                  >
-                    <option value="DISTRIBUTOR">Distributor / Stockist</option>
-                    <option value="WHOLESALER">Wholesaler / Dealer</option>
-                    <option value="RETAILER">Retailer Shop</option>
-                    <option value="CASH_CUSTOMER">Cash Consumer</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">DEFAULT PRICING TIER</label>
-                  <select 
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Assigned Price Tier
+                  </label>
+                  <select
                     value={newCustTier}
-                    onChange={e => setNewCustTier(e.target.value as any)}
-                    className="form-input"
+                    onChange={(e: any) => setNewCustTier(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
                   >
-                    <option value="tier1_distributor">Tier 1 (Distributor)</option>
-                    <option value="tier2_wholesale">Tier 2 (Wholesale)</option>
-                    <option value="tier3_semi_wholesale">Tier 3 (Semi-Wholesale)</option>
-                    <option value="tier4_retailer">Tier 4 (Retailer)</option>
-                    <option value="tier5_mrp">Tier 5 (MRP)</option>
+                    <option value="tier1_distributor">Tier 1: Master Distributor</option>
+                    <option value="tier2_wholesale">Tier 2: Wholesaler</option>
+                    <option value="tier3_semi_wholesale">Tier 3: Semi-Wholesale</option>
+                    <option value="tier4_retailer">Tier 4: Retailer</option>
                   </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Opening Balance ₹
+                  </label>
+                  <input
+                    type="number"
+                    value={newCustOpeningBal}
+                    onChange={(e) => setNewCustOpeningBal(parseFloat(e.target.value) || 0)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">OPENING RECEIVABLE BALANCE (₹)</label>
-                <input 
-                  type="number" 
-                  value={newCustOpeningBal}
-                  onChange={e => setNewCustOpeningBal(parseFloat(e.target.value) || 0)}
-                  className="form-input font-mono"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-                <button onClick={handleAddNewCustomer} className="btn-primary" style={{ flex: 1, padding: '12px' }}>
-                  <UserPlus size={15} /> Save & Select Customer
-                </button>
-                <button onClick={() => setShowAddCustomerModal(false)} className="btn-secondary" style={{ padding: '12px 18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomerModal(false)}
+                  style={{ padding: '8px 14px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
                   Cancel
                 </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', borderRadius: '6px', background: 'var(--accent-orange)', border: 'none', color: '#FFF', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Save & Select Client
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
+
+      {/* ==================================================================== */}
+      {/* MODAL: SALES RETURN (DAMAGED / DEFECTIVE GOODS)                      */}
+      {/* ==================================================================== */}
+      {showSalesReturnModal && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--bg-secondary)',
+              width: '100%',
+              maxWidth: '680px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-medium)',
+              padding: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <RotateCcw size={18} /> Sales Return & Credit Note (Broken Goods)
+                </h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  Returned items are placed into <strong>Damaged / Broken Stock</strong> (NOT main sellable stock) and credit customer account.
+                </span>
+              </div>
+              <button onClick={() => setShowSalesReturnModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSalesReturn} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Customer Account *
+                  </label>
+                  <select
+                    value={srCustomerId}
+                    onChange={(e) => setSrCustomerId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.partyName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    Original Invoice Ref #
+                  </label>
+                  <input
+                    type="text"
+                    value={srInvoiceRef}
+                    onChange={(e) => setSrInvoiceRef(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Return Items */}
+              {srLines.map((line, idx) => (
+                <div key={idx} style={{ background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Product</label>
+                    <select
+                      value={line.productId}
+                      onChange={(e) => {
+                        const p = catalog.find(prod => prod.id === e.target.value);
+                        if (p) {
+                          setSrLines(prev => prev.map((l, i) => i === idx ? {
+                            ...l,
+                            productId: p.id,
+                            productSku: p.sku,
+                            productName: p.name,
+                            unitPrice: p.pricing.tier2_wholesale,
+                            gstRate: p.gstRate
+                          } : l));
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px'
+                      }}
+                    >
+                      {catalog.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Damaged Qty</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={line.damagedQuantity}
+                      onChange={(e) => {
+                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                        setSrLines(prev => prev.map((l, i) => i === idx ? { ...l, damagedQuantity: val } : l));
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        textAlign: 'center'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Defect Type</label>
+                    <select
+                      value={srDamageType}
+                      onChange={(e: any) => setSrDamageType(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <option value="CRACKED">Cracked</option>
+                      <option value="BROKEN">Broken Piece</option>
+                      <option value="DEFECTIVE_MOULD">Defective Mould</option>
+                      <option value="COLOR_DEFECT">Color Defect</option>
+                    </select>
+                  </div>
+                </div>
+              ))}
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Return Remarks
+                </label>
+                <input
+                  type="text"
+                  value={srNotes}
+                  onChange={(e) => setSrNotes(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowSalesReturnModal(false)}
+                  style={{ padding: '8px 14px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', borderRadius: '6px', background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', border: 'none', color: '#FFF', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Post Credit Note & Move to Damaged Stock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

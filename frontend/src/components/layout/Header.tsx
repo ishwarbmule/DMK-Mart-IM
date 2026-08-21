@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   X,
   ChevronDown,
-  Calendar
+  Calendar,
+  Menu
 } from 'lucide-react';
 import { CompanyVertical, TenantInfo } from '../../types/erp';
 import { DMK_MART_COMPANY } from '../../data/multiCompanyData';
@@ -25,6 +26,7 @@ interface HeaderProps {
   onOpenCommandPalette: () => void;
   onToggleSidecar: () => void;
   isSidecarOpen: boolean;
+  onToggleMobileSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,7 +34,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeCompany = DMK_MART_COMPANY,
   onOpenCommandPalette,
   onToggleSidecar,
-  isSidecarOpen
+  isSidecarOpen,
+  onToggleMobileSidebar
 }) => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -61,8 +64,30 @@ export const Header: React.FC<HeaderProps> = ({
         backdropFilter: 'blur(16px)'
       }}
     >
-      {/* Left: Clean System Status Indicator & Live Date Badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* Left: Mobile Menu Trigger & Status Badges */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {onToggleMobileSidebar && (
+          <button
+            className="mobile-hamburger-btn"
+            onClick={onToggleMobileSidebar}
+            title="Toggle Navigation Menu"
+            style={{
+              display: 'none', // Overridden by CSS on <= 900px
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-medium)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+          >
+            <Menu size={18} />
+          </button>
+        )}
+
         <div 
           style={{
             display: 'flex',

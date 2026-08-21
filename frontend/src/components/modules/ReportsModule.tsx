@@ -97,7 +97,7 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({
       }
 
       case 'customer_ledger': {
-        const totalBalance = customers.reduce((acc, c) => acc + c.outstandingBalance, 0);
+        const totalBalance = customers.reduce((acc, c) => acc + (c.closingBalance || c.outstandingBalance || 0), 0);
 
         return {
           filename: `DMK_Customer_Aging_Ledger_${activeCompany.companyCode}_${today}`,
@@ -115,16 +115,19 @@ export const ReportsModule: React.FC<ReportsModuleProps> = ({
             { header: 'Outstanding Balance (₹)', key: 'balance', width: 20, align: 'right' },
             { header: 'Aging Status', key: 'aging', width: 14, align: 'center' }
           ],
-          data: customers.map(c => ({
-            name: c.partyName,
-            city: c.city,
-            state: c.stateCode,
-            gstin: c.gstin || 'Unregistered',
-            invoiced: c.outstandingBalance + 75000,
-            paid: 75000,
-            balance: c.outstandingBalance,
-            aging: c.outstandingBalance > 0 ? '0-30 Days' : 'Settled'
-          })),
+          data: customers.map(c => {
+            const bal = c.closingBalance || c.outstandingBalance || 0;
+            return {
+              name: c.partyName,
+              city: c.city,
+              state: c.stateCode,
+              gstin: c.gstin || 'Unregistered',
+              invoiced: bal + 75000,
+              paid: 75000,
+              balance: bal,
+              aging: bal > 0 ? '0-30 Days' : 'Settled'
+            };
+          }),
           summaryRows: [
             {
               label: 'Total Accounts Receivable',

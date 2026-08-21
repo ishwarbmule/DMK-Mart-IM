@@ -254,7 +254,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
 
   // Today's summary metrics
   const todayRecord = dailyDaybookHistory.find(d => d.date === getTodayISODate()) || dailyDaybookHistory[0];
-  const totalReceivablesDue = useMemo(() => customers.reduce((acc, c) => acc + c.outstandingBalance, 0), [customers]);
+  const totalReceivablesDue = useMemo(() => customers.reduce((acc, c) => acc + (c.closingBalance || c.outstandingBalance || 0), 0), [customers]);
 
   // Party Ledger Calculations
   const selectedParty = customers.find(c => c.id === selectedPartyId) || customers[0];
@@ -890,7 +890,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
               >
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.partyName} ({c.city}) — Outstanding: ₹{c.outstandingBalance.toLocaleString('en-IN')} {c.balanceType}
+                    {c.partyName} ({c.city}) — Outstanding: ₹{(c.closingBalance || c.outstandingBalance || 0).toLocaleString('en-IN')} {c.balanceType}
                   </option>
                 ))}
               </select>
@@ -1147,7 +1147,7 @@ export const FinancialBookkeepingModule: React.FC<FinancialBookkeepingProps> = (
                 >
                   {customers.map(c => (
                     <option key={c.id} value={c.id}>
-                      {c.partyName} (Due: ₹{c.outstandingBalance.toLocaleString('en-IN')} {c.balanceType})
+                      {c.partyName} (Due: ₹{(c.closingBalance || c.outstandingBalance || 0).toLocaleString('en-IN')} {c.balanceType})
                     </option>
                   ))}
                 </select>
